@@ -1,12 +1,5 @@
-import { 
-  Printer, 
-  RotateCcw, 
-  ChevronLeft, 
-  ChevronRight, 
-  CalendarCheck,
-  Info
-} from 'lucide-react';
-import { useState, useMemo } from 'react';
+import { Printer, RotateCcw, ChevronLeft, ChevronRight, CalendarCheck, Info } from 'lucide-react';
+import { useMemo } from 'react';
 import { format, getMonth, getYear, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '../utils/cn';
@@ -22,13 +15,12 @@ export function EscalaView() {
     setEscalas, 
     diasAtivos, 
     localidade,
+    dataAlvo: dataAlvoISO,
+    setDataAlvo,
     updateCargaAcumulada 
   } = useStore();
   
-  const [dataAlvo, setDataAlvo] = useState(() => {
-    const d = new Date();
-    return new Date(d.getFullYear(), d.getMonth(), 1);
-  });
+  const dataAlvo = useMemo(() => parseISO(dataAlvoISO), [dataAlvoISO]);
   
   const mesAtual = getMonth(dataAlvo);
   const anoAtual = getYear(dataAlvo);
@@ -47,7 +39,7 @@ export function EscalaView() {
 
   const mudarMes = (delta: number) => {
     const nova = new Date(dataAlvo.getFullYear(), dataAlvo.getMonth() + delta, 1);
-    setDataAlvo(nova);
+    setDataAlvo(nova.toISOString());
   };
 
   // Agrupar escala por data para o grid
@@ -99,7 +91,7 @@ export function EscalaView() {
           </div>
           
           <div className="flex flex-col items-center md:items-end gap-2">
-            <h1 className="text-4xl font-black text-blue-600 capitalize-first tracking-tighter">
+            <h1 className="text-4xl font-black text-blue-600 capitalize tracking-tighter">
               {format(dataAlvo, 'MMMM yyyy', { locale: ptBR })}
             </h1>
             <p className="text-slate-500 font-black uppercase text-xs tracking-[0.2em]">Escala das Auxiliares das Portas</p>

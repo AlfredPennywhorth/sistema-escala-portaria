@@ -8,6 +8,7 @@ interface AppState {
   escalas: Turno[];
   diasAtivos: DiaSemana[];
   localidade: string;
+  dataAlvo: string; // ISO String
   
   // Actions
   addColaboradora: (col: Colaboradora) => void;
@@ -18,6 +19,7 @@ interface AppState {
   removeLocal: (id: string) => void;
   
   setEscalas: (escalas: Turno[]) => void;
+  setDataAlvo: (data: string) => void;
   updateCargaAcumulada: (colaboradoraId: string, delta: number) => void;
 }
 
@@ -48,6 +50,7 @@ export const useStore = create<AppState>()(
       escalas: [],
       diasAtivos: ['Domingo', 'Terça-Feira', 'Sábado'],
       localidade: 'JARDIM SANTO EDUARDO',
+      dataAlvo: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString(),
 
       addColaboradora: (col) => set((state) => ({ colaboradoras: [...state.colaboradoras, col] })),
       removeColaboradora: (id) => set((state) => ({ colaboradoras: state.colaboradoras.filter(c => c.id !== id) })),
@@ -59,6 +62,7 @@ export const useStore = create<AppState>()(
       removeLocal: (id) => set((state) => ({ locais: state.locais.filter(l => l.id !== id) })),
 
       setEscalas: (escalas) => set({ escalas }),
+      setDataAlvo: (dataAlvo) => set({ dataAlvo }),
       
       updateCargaAcumulada: (colaboradoraId, delta) => set((state) => ({
         colaboradoras: state.colaboradoras.map(c => 
