@@ -1,11 +1,71 @@
-import { Printer, RotateCcw, ChevronLeft, ChevronRight, CalendarCheck, Info } from 'lucide-react';
-import { useMemo } from 'react';
+import { Printer, RotateCcw, ChevronLeft, ChevronRight, CalendarCheck, Info, AlertCircle, Save, Lock, AlertTriangle, TrendingUp } from 'lucide-react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import { format, getMonth, getYear, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '../utils/cn';
 import { useStore } from '../store/useStore';
-import { gerarEscalaMensal } from '../utils/scheduling';
 import logoCCB from '../assets/logo-ccb.png';
+import { type ItemEscalaConsolidado } from '../services/rodiziosService';
+import * as rodiziosService from '../services/rodiziosService';
+import * as auxiliaresService from '../services/auxiliaresService';
+import { prepararDadosParaGeracaoRodizio, criarEntradaGeracaoRodizio } from '../domain/prepararGeracaoRodizio';
+import { gerarRodizioEquilibrado } from '../domain/gerarRodizioEquilibrado';
+import type { RodizioComItens, Auxiliar, Rodizio } from '../types/supabase';
+import type { ItemRodizioSugerido, AlertaGeracaoRodizio, MetricaEquilibrioAuxiliar, ViolacaoRestricao, RestricaoConsiderada } from '../types/geracaoRodizio';
+
+const DIAS_SEMANA_NOMES: Record<number, string> = {
+  0: 'Domingo',
+  1: 'Segunda-feira',
+  2: 'Terça-feira',
+  3: 'Quarta-feira',
+  4: 'Quinta-feira',
+  5: 'Sexta-feira',
+  6: 'Sábado',
+};
+
+const MAPA_PORTA_PARA_LOCAL_ID: Record<string, string> = {
+  'entrada': 'l1',
+  'galeria': 'l2',
+  'lateral': 'l3',
+  'sanitario': 'l4',
+  'sanitário': 'l4',
+  'portaria': 'l1',
+  'principal': 'l1',
+};
+
+const normalizarPorta = (porta: string): string => {
+  if (!porta) return '';
+  return porta.toLowerCase()
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+};
+
+const normalizarNomeAuxiliar = (nome: string): string => {
+  if (!nome) return '';
+  return nome.toLowerCase()
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ');
+};
+
+interface SugestaoPreview {
+  itens: ItemRodizioSugerido[];
+  alertas: AlertaGeracaoRodizio[];
+  metricas: MetricaEquilibrioAuxiliar[];
+  violacoes: ViolacaoRestricao[];
+  restricoesConsideradas: RestricaoConsiderada[];
+  rodizioId: string;
+  rodizioTitulo: string;
+  origem: 'travado' | 'publicado' | 'rascunho';
+}
+
+interface LinhaResumo {
+  nomeExibicao: string;
+  contagemPorLocal: Record<string, number>;
+  totalGeral: number;
+}
 
 export function EscalaView() {
   const { 
@@ -13,65 +73,276 @@ export function EscalaView() {
     locais, 
     escalas, 
     setEscalas, 
-    diasAtivos, 
     localidade,
     dataAlvo: dataAlvoISO,
     setDataAlvo,
-    updateCargaAcumulada 
   } = useStore();
+  
+  const [carregandoSupabase, setCarregandoSupabase] = useState(false);
+  const [erroSupabase, setErroSupabase] = useState<string | null>(null);
+  const [itemSupabase, setItemSupabase] = useState<RodizioComItens | null>(null);
+  const [auxiliaresSupabase, setAuxiliaresSupabase] = useState<Record<string, string>>({});
+  const [origemEscala, setOrigemEscala] = useState<string | null>(null);
+  const [infoOrigem, setInfoOrigem] = useState<string | null>(null);
+  const [recalculando, setRecalculando] = useState(false);
+  const [previewSugestao, setPreviewSugestao] = useState<SugestaoPreview | null>(null);
+  const [salvandoSugestao, setSalvandoSugestao] = useState(false);
+  const [erroRecalcular, setErroRecalcular] = useState<string | null>(null);
   
   const dataAlvo = useMemo(() => parseISO(dataAlvoISO), [dataAlvoISO]);
   
   const mesAtual = getMonth(dataAlvo);
   const anoAtual = getYear(dataAlvo);
 
-  const handleGerar = () => {
-    const novaEscala = gerarEscalaMensal(anoAtual, mesAtual, colaboradoras, locais, diasAtivos);
-    setEscalas(novaEscala);
+  const carregarDoSupabase = useCallback(async () => {
+    setCarregandoSupabase(true);
+    setErroSupabase(null);
+    setOrigemEscala(null);
+    setItemSupabase(null);
+    
+    const resultado = await rodiziosService.buscarEscalaMensalConsolidada(anoAtual, mesAtual + 1);
+    
+    if (resultado.error) {
+      setErroSupabase(resultado.error);
+      setCarregandoSupabase(false);
+      return;
+    }
+
+    if (resultado.data) {
+      
+      const novoMapaNomes: Record<string, string> = {};
+      resultado.data.itensConsolidados.forEach((item: ItemEscalaConsolidado) => {
+        novoMapaNomes[item.auxiliarId] = item.auxiliarNome;
+      });
+      
+      const resAuxiliares = await auxiliaresService.listarAuxiliares();
+      if (resAuxiliares.data) {
+        resAuxiliares.data.forEach((a: Auxiliar) => {
+          novoMapaNomes[a.id] = a.nome;
+        });
+      }
+      setAuxiliaresSupabase(novoMapaNomes);
+
+      const mesAnoLabel = format(new Date(anoAtual, mesAtual, 1), 'MMMM/yyyy', { locale: ptBR });
+      const statusLabel = resultado.data.rodizioOficial?.status === 'travado' ? 'Travado' : 'Publicado';
+      const totalOficial = resultado.data.totalItensOficial;
+      const totalHistorico = resultado.data.totalItensHistorico;
+      const totalConsolidado = resultado.data.totalConsolidado;
+      
+      if (totalHistorico > 0) {
+        setInfoOrigem(`${mesAnoLabel.charAt(0).toUpperCase() + mesAnoLabel.slice(1)} — ${statusLabel} — ${totalConsolidado} itens (${totalOficial} oficial + ${totalHistorico} histórico)`);
+      } else {
+        setInfoOrigem(`${mesAnoLabel.charAt(0).toUpperCase() + mesAnoLabel.slice(1)} — ${statusLabel} — ${totalConsolidado} itens`);
+      }
+      
+      setOrigemEscala('supabase');
+      
+      const itensConvertidos = resultado.data.itensConsolidados
+        .map((item: ItemEscalaConsolidado) => {
+          const portaNormalizada = normalizarPorta(item.porta);
+          let localId = MAPA_PORTA_PARA_LOCAL_ID[portaNormalizada];
+          
+          // Tenta encontrar por nome nos locais atuais caso o mapeamento direto falhe
+          if (!localId) {
+            const localCorrespondente = locais.find(l => normalizarPorta(l.nome) === portaNormalizada);
+            localId = localCorrespondente?.id || item.porta;
+          }
+          
+          return {
+            id: `${item.data}-${item.porta}-${item.auxiliarId}`,
+            data: item.data,
+            localId,
+            colaboradoraId: item.auxiliarId,
+            turno: null,
+          };
+        });
+      
+      setEscalas(itensConvertidos);
+    } else {
+      setEscalas([]);
+    }
+    
+    setCarregandoSupabase(false);
+  }, [anoAtual, mesAtual, setEscalas, locais]);
+
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      if (!mounted) return;
+      await carregarDoSupabase();
+    };
+    load();
+    return () => { mounted = false; };
+  }, [carregarDoSupabase]);
+
+  const handleGerar = async () => {
+    const primeiroDia = `${anoAtual}-${String(mesAtual + 1).padStart(2, '0')}-01`;
+    const ultimoDia = new Date(anoAtual, mesAtual + 1, 0).getDate();
+    const ultimoDiaStr = `${anoAtual}-${String(mesAtual + 1).padStart(2, '0')}-${String(ultimoDia).padStart(2, '0')}`;
+    
+    if (itemSupabase?.rodizio.travado) {
+      setErroRecalcular('Este rodízio está travado e não pode ser recalculado. Vá para a tela Rodízios para criar um novo rascunho.');
+      return;
+    }
+    
+    const rascunhoResult = await rodiziosService.listarRodizios();
+    const rascunho = rascunhoResult.data?.find((r: Rodizio) => 
+      r.status === 'rascunho' && 
+      !r.travado &&
+      r.data_inicio <= ultimoDiaStr &&
+      r.data_fim >= primeiroDia
+    );
+    
+    if (!rascunho && !itemSupabase) {
+      setErroRecalcular('Crie um novo rodízio em Rodízios para poder recalcular a escala.');
+      return;
+    }
+    
+    setRecalculando(true);
+    setErroRecalcular(null);
+    
+    try {
+      const dados = await prepararDadosParaGeracaoRodizio();
+      
+      if (dados.erro) {
+        setErroRecalcular(dados.erro);
+        setRecalculando(false);
+        return;
+      }
+      
+      const entrada = criarEntradaGeracaoRodizio(dados, primeiroDia, ultimoDiaStr);
+      const resultado = gerarRodizioEquilibrado(entrada);
+      
+      if (resultado.itens.length === 0) {
+        setErroRecalcular('Não foi possível gerar itens. Verifique auxiliares ativas e portas configuradas.');
+        setRecalculando(false);
+        return;
+      }
+      
+      setPreviewSugestao({
+        itens: resultado.itens,
+        alertas: resultado.alertas,
+        metricas: resultado.metricas,
+        violacoes: resultado.violacoes,
+        restricoesConsideradas: resultado.restricoesConsideradas,
+        rodizioId: itemSupabase?.rodizio.id || rascunho?.id || '',
+        rodizioTitulo: itemSupabase?.rodizio.titulo || rascunho?.titulo || 'Escala Mensal',
+        origem: 'rascunho',
+      });
+      
+    } catch {
+      setErroRecalcular('Erro ao gerar sugestão de equilíbrio.');
+    }
+    
+    setRecalculando(false);
   };
 
-  const handleConfirmar = () => {
-     escalas.forEach(turno => {
-       updateCargaAcumulada(turno.colaboradoraId, 1);
-     });
-     alert('Escala confirmada e histórico atualizado!');
+  const handleSalvarSugestao = async () => {
+    if (!previewSugestao) return;
+
+    setSalvandoSugestao(true);
+    try {
+      const itensParaSalvar = previewSugestao.itens.map(item => ({
+        data: item.data,
+        porta: item.porta,
+        periodo: item.periodo || null,
+        auxiliar_id: item.auxiliarId,
+        observacoes: item.motivoSelecao.length > 0 ? item.motivoSelecao.join('; ') : null,
+      }));
+
+      const result = await rodiziosService.salvarItensRodizio(previewSugestao.rodizioId, itensParaSalvar);
+
+      if (result.error) {
+        setErroRecalcular('Erro ao salvar sugestão: ' + result.error);
+      } else {
+        setOrigemEscala('rascunho');
+        const itensConvertidos = previewSugestao.itens.map(item => ({
+          id: `${item.data}-${item.porta}`,
+          data: item.data,
+          localId: item.porta,
+          colaboradoraId: item.auxiliarId,
+          turno: null,
+        }));
+        setEscalas(itensConvertidos);
+        setPreviewSugestao(null);
+      }
+    } catch {
+      setErroRecalcular('Erro ao salvar sugestão.');
+    }
+    setSalvandoSugestao(false);
   };
 
   const mudarMes = (delta: number) => {
     const nova = new Date(dataAlvo.getFullYear(), dataAlvo.getMonth() + delta, 1);
     setDataAlvo(nova.toISOString());
+    setErroRecalcular(null);
   };
 
-  // Agrupar escala por data para o grid
   const escalaPorData = useMemo(() => {
     const agrupado: Record<string, Record<string, string>> = {};
     escalas.forEach(t => {
       if (!agrupado[t.data]) agrupado[t.data] = {};
-      agrupado[t.data][t.localId] = colaboradoras.find(c => c.id === t.colaboradoraId)?.nome || '-';
+      
+      const nomeStore = colaboradoras.find(c => c.id === t.colaboradoraId)?.nome;
+      const nomeSupabase = auxiliaresSupabase[t.colaboradoraId];
+      
+      agrupado[t.data][t.localId] = nomeStore || nomeSupabase || '-';
     });
     return agrupado;
-  }, [escalas, colaboradoras]);
+  }, [escalas, colaboradoras, auxiliaresSupabase]);
 
   const datasEscaladas = Object.keys(escalaPorData).sort();
 
-  // Cálculo do Quadro Resumo (Contagem por Colaboradora x Local)
   const resumo = useMemo(() => {
-    const r: Record<string, Record<string, number>> = {};
-    colaboradoras.forEach(c => {
-      r[c.id] = {};
-      locais.forEach(l => {
-        r[c.id][l.id] = 0;
-      });
-    });
+    const mapaResumo = new Map<string, LinhaResumo>();
+    
+    // Função auxiliar para inicializar ou obter linha do mapa
+    const obterOuCriarLinha = (nome: string): LinhaResumo => {
+      const nomeNormalizado = normalizarNomeAuxiliar(nome);
+      if (!mapaResumo.has(nomeNormalizado)) {
+        const novaLinha: LinhaResumo = {
+          nomeExibicao: nome,
+          contagemPorLocal: {},
+          totalGeral: 0
+        };
+        locais.forEach(l => { novaLinha.contagemPorLocal[l.id] = 0; });
+        mapaResumo.set(nomeNormalizado, novaLinha);
+      }
+      return mapaResumo.get(nomeNormalizado)!;
+    };
 
-    escalas.forEach(t => {
-      if (r[t.colaboradoraId]) {
-        r[t.colaboradoraId][t.localId] = (r[t.colaboradoraId][t.localId] || 0) + 1;
+    // 1. Processar itens consolidados (Supabase)
+    escalas.forEach(item => {
+      const nomeStore = colaboradoras.find(c => c.id === item.colaboradoraId)?.nome;
+      const nomeSupabase = auxiliaresSupabase[item.colaboradoraId];
+      const nome = nomeStore || nomeSupabase;
+      
+      if (nome) {
+        const linha = obterOuCriarLinha(nome);
+        linha.contagemPorLocal[item.localId] = (linha.contagemPorLocal[item.localId] || 0) + 1;
+        linha.totalGeral += 1;
       }
     });
 
-    return r;
-  }, [escalas, colaboradoras, locais]);
+    // 2. Garantir que todas as auxiliares da store apareçam (mesmo que zeradas) sem duplicar por nome
+    colaboradoras.forEach(c => {
+      obterOuCriarLinha(c.nome);
+    });
+
+    // Converter para array e ordenar por nome
+    const resultado = Array.from(mapaResumo.values()).sort((a, b) => 
+      a.nomeExibicao.localeCompare(b.nomeExibicao)
+    );
+
+    const totalItensConsolidados = escalas.length;
+    const totalGeralResumo = resultado.reduce((acc, curr) => acc + curr.totalGeral, 0);
+
+    console.debug("[EscalaView] total itens consolidados:", totalItensConsolidados);
+    console.debug("[EscalaView] total geral resumo:", totalGeralResumo);
+    console.debug("[EscalaView] linhas resumo:", resultado.length);
+
+    return resultado;
+  }, [escalas, colaboradoras, locais, auxiliaresSupabase]);
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -95,8 +366,53 @@ export function EscalaView() {
               {format(dataAlvo, 'MMMM yyyy', { locale: ptBR })}
             </h1>
             <p className="text-slate-500 font-black uppercase text-xs tracking-[0.2em]">Escala das Auxiliares das Portas</p>
+            {carregandoSupabase && (
+              <span className="text-xs text-slate-400 flex items-center gap-1">
+                <div className="w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                Carregando do Supabase...
+              </span>
+            )}
+            {erroSupabase && (
+              <span className="text-xs text-amber-600 flex items-center gap-1">
+                <AlertCircle className="w-3 h-3" />
+                {erroSupabase}
+              </span>
+            )}
+            {origemEscala === 'travado' && !carregandoSupabase && (
+              <span className="text-xs text-red-600 font-medium flex items-center gap-1">
+                <Lock className="w-3 h-3" />
+                Travado
+              </span>
+            )}
+            {infoOrigem && !carregandoSupabase && (
+              <span className="text-xs text-slate-500 font-mono">
+                Carregado do rodízio: {infoOrigem}
+              </span>
+            )}
+            {origemEscala === 'supabase' && !carregandoSupabase && (
+              <span className="text-xs text-blue-600 font-medium">
+                ✓ Carregado do Supabase
+              </span>
+            )}
+            {origemEscala === 'rascunho' && !carregandoSupabase && (
+              <span className="text-xs text-amber-600 font-medium">
+                ✓ Carregado do rascunho
+              </span>
+            )}
+            {origemEscala === null && !carregandoSupabase && escalas.length === 0 && (
+              <span className="text-xs text-slate-400">
+                Sem rodízio salvo para este mês
+              </span>
+            )}
           </div>
         </div>
+
+        {erroRecalcular && (
+          <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+            <p className="text-sm text-red-700">{erroRecalcular}</p>
+          </div>
+        )}
 
         <div className="mt-8 flex flex-wrap gap-3 no-print">
           <div className="flex items-center bg-slate-100 rounded-2xl p-1">
@@ -137,15 +453,16 @@ export function EscalaView() {
               ) : (
                 datasEscaladas.map(dataStr => {
                   const dataObj = parseISO(dataStr);
-                  const diaSemana = format(dataObj, 'EEEE', { locale: ptBR });
-                  const isWeekend = diaSemana === 'domingo' || diaSemana === 'sábado';
+                  const diaSemanaNum = dataObj.getDay();
+                  const diaSemanaNome = DIAS_SEMANA_NOMES[diaSemanaNum] || '';
+                  const isWeekend = diaSemanaNum === 0 || diaSemanaNum === 6;
                   
                   return (
                     <tr key={dataStr} className={cn("group transition-colors", isWeekend ? "bg-blue-50/30" : "hover:bg-slate-50")}>
                       <td className="px-6 py-4 border-r border-slate-100">
                         <div className="flex flex-col">
-                           <span className="text-xl font-black text-slate-900">{format(dataObj, 'dd')}</span>
-                           <span className="text-[10px] uppercase font-black text-blue-600 tracking-wider font-mono">{diaSemana}</span>
+                           <span className="text-xl font-black text-slate-900">{format(dataObj, 'dd/MM/yyyy')}</span>
+                           <span className="text-[10px] uppercase font-black text-blue-600 tracking-wider font-mono">{diaSemanaNome}</span>
                         </div>
                       </td>
                       {locais.map(l => (
@@ -183,22 +500,19 @@ export function EscalaView() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {colaboradoras.sort((a,b) => a.nome.localeCompare(b.nome)).map(c => {
-                const total = Object.values(resumo[c.id]).reduce((a, b) => a + b, 0);
-                return (
-                  <tr key={c.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-6 py-3 font-bold text-slate-700 text-sm">{c.nome}</td>
-                    {locais.map(l => (
-                      <td key={l.id} className="px-6 py-3 text-center text-sm font-medium text-slate-600 border-l border-slate-100">
-                        {resumo[c.id][l.id] || 0}
-                      </td>
-                    ))}
-                    <td className="px-6 py-3 text-center font-black text-blue-700 border-l border-slate-100 bg-blue-50/30">
-                      {total}
+              {resumo.map((linha) => (
+                <tr key={linha.nomeExibicao} className="hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0">
+                  <td className="px-6 py-4 text-left font-medium text-slate-700">{linha.nomeExibicao}</td>
+                  {locais.map(l => (
+                    <td key={l.id} className="px-6 py-4 text-center text-slate-600 border-l border-slate-100">
+                      {linha.contagemPorLocal[l.id] || 0}
                     </td>
-                  </tr>
-                );
-              })}
+                  ))}
+                  <td className="px-6 py-4 text-center font-bold text-indigo-600 border-l border-slate-100 bg-indigo-50/30">
+                    {linha.totalGeral}
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
@@ -215,7 +529,7 @@ export function EscalaView() {
               <ul className="text-sm text-amber-800/80 space-y-2 font-medium">
                 <li>• Respeita as restrições individuais de dia da semana (ex: Bruna Gasque 🚫 Terça).</li>
                 <li>• Respeita as restrições de local (ex: Sanitário atende requisitos específicos).</li>
-                <li>• Prioriza colaboradoras com <strong>menor carga acumulada</strong> para garantir equidade.</li>
+                <li>• Considera o histórico realizado no equilíbrio.</li>
                 <li>• Implementa rotação automática para evitar repetir o mesmo local consecutivamente.</li>
               </ul>
            </div>
@@ -224,13 +538,195 @@ export function EscalaView() {
         <div className="bg-blue-600 rounded-3xl p-8 text-white flex flex-col justify-between shadow-xl shadow-blue-200">
            <div>
               <h3 className="font-black h3 uppercase text-sm tracking-widest mb-2 opacity-80">Ações de Fechamento</h3>
-              <p className="text-sm font-semibold opacity-90 leading-relaxed">Considera esta escala definitiva? Ao confirmar, o histórico de turnos de cada colaboradora será atualizado permanentemente.</p>
+              <p className="text-sm font-semibold opacity-90 leading-relaxed">
+                {origemEscala === 'travado' 
+                  ? 'Este rodízio está travado e não pode ser alterado.'
+                  : 'Use "Recalcular Escala" para gerar uma nova sugestão.'}
+              </p>
            </div>
-           <button onClick={handleConfirmar} className="mt-6 w-full bg-white text-blue-700 font-black py-4 rounded-2xl hover:bg-slate-100 transition-all flex items-center justify-center gap-2">
-              <CalendarCheck className="w-5 h-5" /> Confirmar Escala do Mês
-           </button>
+           {origemEscala !== 'travado' && (
+             <button onClick={handleGerar} disabled={recalculando} className="mt-6 w-full bg-white text-blue-700 font-black py-4 rounded-2xl hover:bg-slate-100 transition-all flex items-center justify-center gap-2 disabled:opacity-50">
+               {recalculando ? (
+                 <>
+                   <div className="w-5 h-5 border-2 border-blue-700 border-t-transparent rounded-full animate-spin" />
+                   Gerando...
+                 </>
+               ) : (
+                 <>
+                   <RotateCcw className="w-5 h-5" /> Recalcular Escala
+                 </>
+               )}
+             </button>
+           )}
         </div>
       </footer>
+
+      {/* Preview Modal */}
+      {previewSugestao && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto bg-white rounded-2xl shadow-2xl">
+            <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6 rounded-t-2xl flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <TrendingUp className="w-6 h-6" />
+                <h2 className="text-xl font-bold">Sugestão Equilibrada</h2>
+              </div>
+              <button
+                onClick={() => setPreviewSugestao(null)}
+                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-slate-500">Rodízio</p>
+                  <p className="font-bold text-slate-800">{previewSugestao.rodizioTitulo}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm text-slate-500">Total de itens</p>
+                  <p className="font-bold text-2xl text-blue-600">{previewSugestao.itens.length}</p>
+                </div>
+              </div>
+
+              {previewSugestao.alertas.length > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <AlertTriangle className="w-5 h-5 text-amber-600" />
+                    <p className="font-semibold text-amber-800">Alertas ({previewSugestao.alertas.length})</p>
+                  </div>
+                  <ul className="space-y-1">
+                    {previewSugestao.alertas.map((alerta, idx) => (
+                      <li key={idx} className="text-sm text-amber-700 flex items-start gap-2">
+                        <span className="font-mono text-xs bg-amber-100 px-1 rounded">{alerta.tipo}</span>
+                        {alerta.mensagem}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {previewSugestao.restricoesConsideradas.length > 0 && (
+                <div className="bg-purple-50 border border-purple-200 rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <AlertCircle className="w-5 h-5 text-purple-600" />
+                    <p className="font-semibold text-purple-800">Restrições Consideradas ({previewSugestao.restricoesConsideradas.length})</p>
+                  </div>
+                  <div className="space-y-2">
+                    {previewSugestao.restricoesConsideradas.slice(0, 5).map((restricao, idx) => (
+                      <div key={idx} className="bg-white rounded-lg p-3 border border-purple-100 text-sm">
+                        <span className="font-medium text-slate-800">{restricao.auxiliarNome}</span>
+                        <span className={`ml-2 px-2 py-0.5 rounded text-xs font-bold ${
+                          restricao.tipo === 'indisponivel' ? 'bg-red-100 text-red-700' :
+                          restricao.tipo === 'evitar' ? 'bg-amber-100 text-amber-700' :
+                          'bg-green-100 text-green-700'
+                        }`}>
+                          {restricao.tipo}
+                        </span>
+                        {restricao.porta && <span className="text-xs text-slate-500 ml-2">Porta: {restricao.porta}</span>}
+                      </div>
+                    ))}
+                    {previewSugestao.restricoesConsideradas.length > 5 && (
+                      <p className="text-xs text-slate-500">... e mais {previewSugestao.restricoesConsideradas.length - 5} restrições</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {previewSugestao.violacoes.length > 0 && (
+                <div className="bg-red-50 border-2 border-red-400 rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <AlertCircle className="w-6 h-6 text-red-600" />
+                    <p className="font-bold text-red-800 text-lg">Violações de Restrição ({previewSugestao.violacoes.length})</p>
+                  </div>
+                  <p className="text-sm text-red-700 mb-3">
+                    Existem restrições <strong>indisponíveis</strong> violadas. Ajuste as restrições ou gere novamente.
+                  </p>
+                  <div className="bg-white rounded-lg border border-red-200 overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead className="bg-red-100">
+                        <tr>
+                          <th className="px-3 py-2 text-left font-semibold text-red-700">Data</th>
+                          <th className="px-3 py-2 text-left font-semibold text-red-700">Porta</th>
+                          <th className="px-3 py-2 text-left font-semibold text-red-700">Auxiliar</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-red-100">
+                        {previewSugestao.violacoes.map((violacao, idx) => (
+                          <tr key={idx} className="bg-red-50">
+                            <td className="px-3 py-2 font-medium text-slate-800">{violacao.data}</td>
+                            <td className="px-3 py-2 text-slate-600">{violacao.porta}</td>
+                            <td className="px-3 py-2 font-bold text-red-700">{violacao.auxiliar}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <p className="font-semibold text-slate-800 mb-3">Itens Sugeridos</p>
+                <div className="border border-slate-200 rounded-xl overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-slate-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left font-semibold text-slate-600">Data</th>
+                        <th className="px-4 py-3 text-left font-semibold text-slate-600">Porta</th>
+                        <th className="px-4 py-3 text-left font-semibold text-slate-600">Auxiliar</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {previewSugestao.itens.map((item, idx) => (
+                        <tr key={idx} className="hover:bg-slate-50">
+                          <td className="px-4 py-3 font-medium text-slate-800">
+                            {format(parseISO(item.data), 'dd/MM/yyyy')}
+                          </td>
+                          <td className="px-4 py-3 text-slate-600">{item.porta}</td>
+                          <td className="px-4 py-3 font-medium text-blue-700">{item.auxiliarNome}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
+                <button
+                  onClick={() => setPreviewSugestao(null)}
+                  className="px-6 py-3 bg-slate-100 text-slate-700 font-bold rounded-xl hover:bg-slate-200 transition-all"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleSalvarSugestao}
+                  disabled={salvandoSugestao || previewSugestao.violacoes.length > 0}
+                  className="px-6 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  title={previewSugestao.violacoes.length > 0 ? 'Não é possível salvar com violações de restrição' : ''}
+                >
+                  {salvandoSugestao ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Salvando...
+                    </>
+                  ) : previewSugestao.violacoes.length > 0 ? (
+                    <>
+                      <AlertCircle className="w-4 h-4" />
+                      Violações Impedem Salvamento
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" />
+                      Salvar Sugestão
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
