@@ -345,10 +345,10 @@ export function EscalaView() {
   }, [escalas, colaboradoras, locais, auxiliaresSupabase]);
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+    <div className="print-root space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
       
       {/* Header p/ Impressão / Visual */}
-      <header className="bg-white rounded-3xl shadow-xl shadow-slate-200/50 p-8 border border-slate-100 relative overflow-hidden">
+      <header className="bg-white rounded-3xl shadow-xl shadow-slate-200/50 p-8 border border-slate-100 relative overflow-hidden print-page-escala">
         <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none no-print">
            <CalendarCheck className="w-64 h-64 -mr-16 -mt-16" />
         </div>
@@ -429,8 +429,8 @@ export function EscalaView() {
         </div>
       </header>
 
-      {/* Grid Table */}
-      <section className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+      {/* Grid Table - Página 1 */}
+      <section className="print-page-escala bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -479,8 +479,8 @@ export function EscalaView() {
         </div>
       </section>
 
-      {/* Quadro Resumo */}
-      <section className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+      {/* Quadro Resumo - Página 2 (verso) */}
+      <section className="print-page-resumo bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="bg-slate-50 px-8 py-4 border-b border-slate-200 flex items-center justify-between">
           <h2 className="text-xs font-black text-slate-500 uppercase tracking-[0.3em]">Quadro Resumo de Atividades (Mês)</h2>
         </div>
