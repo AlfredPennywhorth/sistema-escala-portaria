@@ -102,6 +102,13 @@ export interface AlertaGeracaoRodizio {
   auxiliarId?: string;
 }
 
+export interface ItemPreservado {
+  data: string;
+  porta: string;
+  auxiliarId: string;
+  auxiliarNome?: string;
+}
+
 export interface EntradaGeracaoRodizio {
   dataInicio: string;
   dataFim: string;
@@ -112,6 +119,7 @@ export interface EntradaGeracaoRodizio {
   restricoes: RestricaoInfo[];
   historicoTravado: HistoricoRodizio[];
   configuracoes?: Partial<ConfiguracaoPesos>;
+  itensPreservados?: ItemPreservado[];
 }
 
 export interface ResultadoGeracaoRodizio {

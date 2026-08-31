@@ -56,7 +56,7 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
 
       {/* Sidebar */}
       <aside className={cn(
-        "fixed inset-y-0 left-0 w-64 bg-white border-r border-slate-200 z-50 transform transition-transform duration-300 lg:translate-x-0 lg:static flex flex-col",
+        "fixed inset-y-0 left-0 w-64 bg-white border-r border-slate-200 z-50 transform transition-transform duration-300 lg:translate-x-0 lg:static flex flex-col no-print",
         sidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         {/* Header/Logo */}

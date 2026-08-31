@@ -18,7 +18,7 @@ export function ConfigCheck() {
 
   if (missingVars) {
     return (
-      <div className="fixed bottom-4 right-4 max-w-sm bg-amber-50 border border-amber-200 rounded-xl p-4 shadow-lg z-50">
+      <div className="fixed bottom-4 right-4 max-w-sm bg-amber-50 border border-amber-200 rounded-xl p-4 shadow-lg z-50 no-print">
         <div className="flex items-start gap-3">
           <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
           <div>
@@ -50,7 +50,7 @@ export function ConfigCheck() {
   }
 
   return (
-    <div className="fixed bottom-4 right-4 max-w-xs bg-green-50 border border-green-200 rounded-xl p-3 shadow-lg z-50">
+    <div className="fixed bottom-4 right-4 max-w-xs bg-green-50 border border-green-200 rounded-xl p-3 shadow-lg z-50 no-print">
       <div className="flex items-center gap-2 text-green-700">
         <CheckCircle className="w-4 h-4" />
         <span className="text-sm font-medium">Supabase configurado</span>

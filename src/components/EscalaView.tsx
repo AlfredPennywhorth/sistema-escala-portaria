@@ -13,16 +13,6 @@ import { gerarRodizioEquilibrado } from '../domain/gerarRodizioEquilibrado';
 import type { RodizioComItens, Auxiliar, Rodizio } from '../types/supabase';
 import type { ItemRodizioSugerido, AlertaGeracaoRodizio, MetricaEquilibrioAuxiliar, ViolacaoRestricao, RestricaoConsiderada } from '../types/geracaoRodizio';
 
-const DIAS_SEMANA_NOMES: Record<number, string> = {
-  0: 'Domingo',
-  1: 'Segunda-feira',
-  2: 'Terça-feira',
-  3: 'Quarta-feira',
-  4: 'Quinta-feira',
-  5: 'Sexta-feira',
-  6: 'Sábado',
-};
-
 const MAPA_PORTA_PARA_LOCAL_ID: Record<string, string> = {
   'entrada': 'l1',
   'galeria': 'l2',
@@ -66,6 +56,74 @@ interface LinhaResumo {
   contagemPorLocal: Record<string, number>;
   totalGeral: number;
 }
+
+const ORDEM_FIXA_SERVICOS = ['entrada', 'galeria', 'lateral', 'sanitario'];
+
+interface CalendarDay {
+  date: Date;
+  dateStr: string;
+  dayNumber: number;
+  isCurrentMonth: boolean;
+}
+
+const getCalendarRows = (month: number, year: number): CalendarDay[][] => {
+  const firstDayOfMonth = new Date(year, month, 1);
+  const startDayOfWeek = firstDayOfMonth.getDay(); // 0 = Domingo, ..., 6 = Sábado
+  
+  const lastDayOfMonth = new Date(year, month + 1, 0);
+  const totalDays = lastDayOfMonth.getDate();
+  
+  const prevMonthLastDay = new Date(year, month, 0).getDate();
+  
+  // Calcular número de semanas necessárias
+  const cellsNeeded = startDayOfWeek + totalDays;
+  const weeksNeeded = Math.ceil(cellsNeeded / 7);
+  
+  const days: CalendarDay[] = [];
+  
+  // Dias do mês anterior
+  for (let i = startDayOfWeek - 1; i >= 0; i--) {
+    const dayNum = prevMonthLastDay - i;
+    const dateObj = new Date(year, month - 1, dayNum);
+    days.push({
+      date: dateObj,
+      dateStr: format(dateObj, 'yyyy-MM-dd'),
+      dayNumber: dayNum,
+      isCurrentMonth: false
+    });
+  }
+  
+  // Dias do mês atual
+  for (let i = 1; i <= totalDays; i++) {
+    const dateObj = new Date(year, month, i);
+    days.push({
+      date: dateObj,
+      dateStr: format(dateObj, 'yyyy-MM-dd'),
+      dayNumber: i,
+      isCurrentMonth: true
+    });
+  }
+  
+  // Dias do próximo mês (completar semanas necessárias)
+  const totalCells = weeksNeeded * 7;
+  const nextMonthPaddingCount = totalCells - days.length;
+  for (let i = 1; i <= nextMonthPaddingCount; i++) {
+    const dateObj = new Date(year, month + 1, i);
+    days.push({
+      date: dateObj,
+      dateStr: format(dateObj, 'yyyy-MM-dd'),
+      dayNumber: i,
+      isCurrentMonth: false
+    });
+  }
+  
+  const weeks: CalendarDay[][] = [];
+  for (let i = 0; i < days.length; i += 7) {
+    weeks.push(days.slice(i, i + 7));
+  }
+  
+  return weeks;
+};
 
 export function EscalaView() {
   const { 
@@ -135,6 +193,13 @@ export function EscalaView() {
         setInfoOrigem(`${mesAnoLabel.charAt(0).toUpperCase() + mesAnoLabel.slice(1)} — ${statusLabel} — ${totalConsolidado} itens`);
       }
       
+      if (resultado.data.rodizioOficial) {
+        setItemSupabase({
+          rodizio: resultado.data.rodizioOficial,
+          itens: []
+        });
+      }
+
       setOrigemEscala('supabase');
       
       const itensConvertidos = resultado.data.itensConsolidados
@@ -210,7 +275,27 @@ export function EscalaView() {
         return;
       }
       
-      const entrada = criarEntradaGeracaoRodizio(dados, primeiroDia, ultimoDiaStr);
+      // Preservar escalas anteriores à data de hoje
+      const hojeStr = format(new Date(), 'yyyy-MM-dd');
+      const itensPreservados = escalas
+        .filter(item => item.data < hojeStr)
+        .map(item => {
+          const colaborador = colaboradoras.find(c => c.id === item.colaboradoraId);
+          const auxiliarNome = colaborador?.nome || 'Preservada';
+          const local = locais.find(l => l.id === item.localId);
+          const localNome = local?.nome || item.localId;
+          return {
+            data: item.data,
+            porta: localNome,
+            auxiliarId: item.colaboradoraId,
+            auxiliarNome,
+          };
+        });
+
+      const entrada = {
+        ...criarEntradaGeracaoRodizio(dados, primeiroDia, ultimoDiaStr),
+        itensPreservados,
+      };
       const resultado = gerarRodizioEquilibrado(entrada);
       
       if (resultado.itens.length === 0) {
@@ -255,15 +340,7 @@ export function EscalaView() {
       if (result.error) {
         setErroRecalcular('Erro ao salvar sugestão: ' + result.error);
       } else {
-        setOrigemEscala('rascunho');
-        const itensConvertidos = previewSugestao.itens.map(item => ({
-          id: `${item.data}-${item.porta}`,
-          data: item.data,
-          localId: item.porta,
-          colaboradoraId: item.auxiliarId,
-          turno: null,
-        }));
-        setEscalas(itensConvertidos);
+        await carregarDoSupabase();
         setPreviewSugestao(null);
       }
     } catch {
@@ -291,7 +368,37 @@ export function EscalaView() {
     return agrupado;
   }, [escalas, colaboradoras, auxiliaresSupabase]);
 
-  const datasEscaladas = Object.keys(escalaPorData).sort();
+  const getEscalaOrdenadaParaDia = useCallback((dataStr: string) => {
+    const escalaDia = escalaPorData[dataStr];
+    if (!escalaDia) return [];
+
+    const locaisOrdenados = [...locais].sort((a, b) => {
+      const normA = normalizarPorta(a.nome);
+      const normB = normalizarPorta(b.nome);
+      
+      const idxA = ORDEM_FIXA_SERVICOS.indexOf(normA);
+      const idxB = ORDEM_FIXA_SERVICOS.indexOf(normB);
+      
+      const posA = idxA === -1 ? 99 : idxA;
+      const posB = idxB === -1 ? 99 : idxB;
+      return posA - posB;
+    });
+
+    return locaisOrdenados
+      .map(l => {
+        const auxiliarNome = escalaDia[l.id];
+        if (auxiliarNome && auxiliarNome !== '-') {
+          return {
+            localNome: l.nome,
+            auxiliarNome
+          };
+        }
+        return null;
+      })
+      .filter(Boolean) as { localNome: string; auxiliarNome: string }[];
+  }, [escalaPorData, locais]);
+
+  const weeks = useMemo(() => getCalendarRows(mesAtual, anoAtual), [mesAtual, anoAtual]);
 
   const resumo = useMemo(() => {
     const mapaResumo = new Map<string, LinhaResumo>();
@@ -345,66 +452,77 @@ export function EscalaView() {
   }, [escalas, colaboradoras, locais, auxiliaresSupabase]);
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 print-container print:space-y-4">
       
       {/* Header p/ Impressão / Visual */}
-      <header className="bg-white rounded-3xl shadow-xl shadow-slate-200/50 p-8 border border-slate-100 relative overflow-hidden">
+      <header className="bg-white rounded-3xl shadow-xl shadow-slate-200/50 p-8 border border-slate-100 relative overflow-hidden print-header-compact">
         <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none no-print">
            <CalendarCheck className="w-64 h-64 -mr-16 -mt-16" />
         </div>
         
-        <div className="flex flex-col md:flex-row justify-between items-center gap-8 relative z-10">
-          <div className="flex flex-col items-center md:items-start text-center md:text-left gap-2">
-            <div className="flex flex-col items-center bg-white p-2 rounded-xl">
-               <img src={logoCCB} alt="Logo CCB" className="h-24 w-auto object-contain" />
-               <p className="text-xl font-black text-slate-800 tracking-widest uppercase mt-2">{localidade}</p>
+        <div className="flex flex-row justify-between items-center gap-4 relative z-10 w-full border-b border-slate-200 pb-6 print:pb-2">
+          {/* Lado Esquerdo: Logotipo */}
+          <div className="flex-1 flex justify-start">
+            <div className="border border-slate-800 p-1.5 rounded-sm bg-white print:p-0.5">
+              <img src={logoCCB} alt="CCB" className="h-10 w-auto object-contain print:h-8" />
             </div>
           </div>
           
-          <div className="flex flex-col items-center md:items-end gap-2">
-            <h1 className="text-4xl font-black text-blue-600 capitalize tracking-tighter">
-              {format(dataAlvo, 'MMMM yyyy', { locale: ptBR })}
-            </h1>
-            <p className="text-slate-500 font-black uppercase text-xs tracking-[0.2em]">Escala das Auxiliares das Portas</p>
-            {carregandoSupabase && (
-              <span className="text-xs text-slate-400 flex items-center gap-1">
-                <div className="w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-                Carregando do Supabase...
-              </span>
-            )}
-            {erroSupabase && (
-              <span className="text-xs text-amber-600 flex items-center gap-1">
-                <AlertCircle className="w-3 h-3" />
-                {erroSupabase}
-              </span>
-            )}
-            {origemEscala === 'travado' && !carregandoSupabase && (
-              <span className="text-xs text-red-600 font-medium flex items-center gap-1">
-                <Lock className="w-3 h-3" />
-                Travado
-              </span>
-            )}
-            {infoOrigem && !carregandoSupabase && (
-              <span className="text-xs text-slate-500 font-mono">
-                Carregado do rodízio: {infoOrigem}
-              </span>
-            )}
-            {origemEscala === 'supabase' && !carregandoSupabase && (
-              <span className="text-xs text-blue-600 font-medium">
-                ✓ Carregado do Supabase
-              </span>
-            )}
-            {origemEscala === 'rascunho' && !carregandoSupabase && (
-              <span className="text-xs text-amber-600 font-medium">
-                ✓ Carregado do rascunho
-              </span>
-            )}
-            {origemEscala === null && !carregandoSupabase && escalas.length === 0 && (
-              <span className="text-xs text-slate-400">
-                Sem rodízio salvo para este mês
-              </span>
-            )}
+          {/* Centro: Localidade */}
+          <div className="flex-1 text-center">
+            <p className="text-2xl sm:text-3xl font-black text-[#1e40af] tracking-widest uppercase print:text-lg">
+              {localidade}
+            </p>
           </div>
+          
+          {/* Lado Direito: Mês e Ano */}
+          <div className="flex-1 text-right">
+            <h1 className="text-2xl sm:text-3xl font-black text-[#1e40af] capitalize tracking-tight print:text-lg">
+              {format(dataAlvo, 'MMMM \'de\' yyyy', { locale: ptBR })}
+            </h1>
+          </div>
+        </div>
+
+        {/* Metadata badges for system feedback (non-print) */}
+        <div className="mt-4 flex flex-wrap gap-2 justify-end text-xs no-print">
+          {carregandoSupabase && (
+            <span className="bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full flex items-center gap-1.5 font-medium">
+              <div className="w-3 h-3 border-2 border-slate-600 border-t-transparent rounded-full animate-spin" />
+              Carregando do Supabase...
+            </span>
+          )}
+          {erroSupabase && (
+            <span className="bg-red-50 text-red-600 border border-red-100 px-2.5 py-1 rounded-full flex items-center gap-1.5 font-medium">
+              <AlertCircle className="w-3.5 h-3.5" />
+              {erroSupabase}
+            </span>
+          )}
+          {origemEscala === 'travado' && (
+            <span className="bg-red-50 text-red-700 border border-red-100 px-2.5 py-1 rounded-full flex items-center gap-1.5 font-semibold">
+              <Lock className="w-3.5 h-3.5" />
+              Escala Travada
+            </span>
+          )}
+          {infoOrigem && (
+            <span className="bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full font-mono">
+              Origem: {infoOrigem}
+            </span>
+          )}
+          {origemEscala === 'supabase' && !carregandoSupabase && (
+            <span className="bg-blue-50 text-blue-700 border border-blue-100 px-2.5 py-1 rounded-full font-semibold">
+              ✓ Supabase
+            </span>
+          )}
+          {origemEscala === 'rascunho' && !carregandoSupabase && (
+            <span className="bg-amber-50 text-amber-700 border border-amber-100 px-2.5 py-1 rounded-full font-semibold">
+              ✓ Rascunho
+            </span>
+          )}
+          {origemEscala === null && !carregandoSupabase && escalas.length === 0 && (
+            <span className="bg-slate-50 text-slate-400 px-2.5 py-1 rounded-full">
+              Sem rodízio salvo
+            </span>
+          )}
         </div>
 
         {erroRecalcular && (
@@ -430,49 +548,136 @@ export function EscalaView() {
       </header>
 
       {/* Grid Table */}
-      <section className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+      <section className="bg-white rounded-3xl shadow-sm border border-slate-800 overflow-hidden print:border-slate-800">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+          <table className="calendar-table w-full text-center border-collapse border border-slate-800">
             <thead>
-              <tr className="bg-slate-900 border-b border-slate-800">
-                <th className="px-6 py-5 text-xs font-black text-white uppercase tracking-[0.3em] w-48">Data / Dia</th>
-                {locais.map(l => (
-                  <th key={l.id} className="px-6 py-5 text-xs font-black text-white uppercase tracking-[0.3em] text-center border-l border-slate-800">
-                    {l.nome}
-                  </th>
-                ))}
+              <tr className="bg-[#0b2c5c] text-white print:bg-[#0b2c5c]">
+                <th className="px-3 py-4 text-xs font-black uppercase tracking-[0.2em] border border-slate-800 text-white w-1/7">Domingo</th>
+                <th className="px-3 py-4 text-xs font-black uppercase tracking-[0.2em] border border-slate-800 text-white w-1/7">Segunda-Feira</th>
+                <th className="px-3 py-4 text-xs font-black uppercase tracking-[0.2em] border border-slate-800 text-white w-1/7">Terça-Feira</th>
+                <th className="px-3 py-4 text-xs font-black uppercase tracking-[0.2em] border border-slate-800 text-white w-1/7">Quarta-Feira</th>
+                <th className="px-3 py-4 text-xs font-black uppercase tracking-[0.2em] border border-slate-800 text-white w-1/7">Quinta-Feira</th>
+                <th className="px-3 py-4 text-xs font-black uppercase tracking-[0.2em] border border-slate-800 text-white w-1/7">Sexta-Feira</th>
+                <th className="px-3 py-4 text-xs font-black uppercase tracking-[0.2em] border border-slate-800 text-white w-1/7">Sábado</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
-              {datasEscaladas.length === 0 ? (
-                <tr>
-                  <td colSpan={locais.length + 1} className="px-6 py-12 text-center text-slate-400 font-medium">
-                    Nenhuma escala gerada para este período. Clique em "Recalcular Escala".
-                  </td>
-                </tr>
-              ) : (
-                datasEscaladas.map(dataStr => {
-                  const dataObj = parseISO(dataStr);
-                  const diaSemanaNum = dataObj.getDay();
-                  const diaSemanaNome = DIAS_SEMANA_NOMES[diaSemanaNum] || '';
-                  const isWeekend = diaSemanaNum === 0 || diaSemanaNum === 6;
-                  
+            <tbody>
+              {weeks.map((week, weekIdx) => {
+                const isWeek6 = weekIdx === 5;
+                const hasCurrentMonthDaysInWeek6Cols2To6 = isWeek6
+                  ? week.slice(2).some(d => d.isCurrentMonth)
+                  : false;
+
+                if (isWeek6 && !hasCurrentMonthDaysInWeek6Cols2To6) {
+                  // Renderiza apenas os 2 primeiros dias (Domingo e Segunda)
+                  // e o resto mesclado para Observações
                   return (
-                    <tr key={dataStr} className={cn("group transition-colors", isWeekend ? "bg-blue-50/30" : "hover:bg-slate-50")}>
-                      <td className="px-6 py-4 border-r border-slate-100">
-                        <div className="flex flex-col">
-                           <span className="text-xl font-black text-slate-900">{format(dataObj, 'dd/MM/yyyy')}</span>
-                           <span className="text-[10px] uppercase font-black text-blue-600 tracking-wider font-mono">{diaSemanaNome}</span>
-                        </div>
+                    <tr key={weekIdx} className="h-28 print:h-auto">
+                      {week.slice(0, 2).map(day => {
+                        const isWeekend = day.date.getDay() === 0 || day.date.getDay() === 6;
+                        const escalaDia = day.isCurrentMonth ? getEscalaOrdenadaParaDia(day.dateStr) : [];
+                        return (
+                          <td
+                            key={day.dateStr}
+                            className={cn(
+                              "calendar-cell border border-slate-800 p-2 align-top text-left relative transition-colors h-28 print:h-auto w-1/7",
+                              isWeekend ? "bg-slate-100/60" : "bg-white",
+                              !day.isCurrentMonth && "bg-slate-50/50"
+                            )}
+                          >
+                            <span
+                              className={cn(
+                                "font-bold text-xs absolute top-1 left-2 select-none",
+                                day.isCurrentMonth ? "text-slate-900" : "text-slate-400"
+                              )}
+                            >
+                              {day.dayNumber}
+                            </span>
+                            {day.isCurrentMonth && escalaDia.length > 0 && (
+                              <div className="mt-5 flex flex-col items-center justify-center gap-1 w-full text-center">
+                                {escalaDia.map((item, idx) => (
+                                  <div
+                                    key={idx}
+                                    className="text-[10px] sm:text-xs font-bold text-slate-800 leading-tight"
+                                  >
+                                    {item.localNome} - {item.auxiliarNome}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </td>
+                        );
+                      })}
+                      <td
+                        colSpan={5}
+                        className="calendar-cell p-3 border border-slate-800 text-left align-top bg-white relative h-28 print:h-auto"
+                      >
+                        <span className="font-bold text-slate-800 text-xs sm:text-sm">Observações:</span>
+                        <p className="mt-1 text-slate-800 text-[10px] sm:text-xs font-semibold leading-relaxed">
+                          Ensaios: Sábados às 17hs. Nos dias de ensaio é necessário o apoio de todos os que estiverem disponíveis. Deus abençoe!
+                        </p>
                       </td>
-                      {locais.map(l => (
-                        <td key={l.id} className="px-6 py-4 text-center border-l border-slate-100">
-                          <p className="font-bold text-slate-800 tracking-tight">{escalaPorData[dataStr][l.id]}</p>
-                        </td>
-                      ))}
                     </tr>
                   );
-                })
+                }
+
+                // Linha normal de semana
+                return (
+                  <tr key={weekIdx} className="h-28 print:h-auto">
+                    {week.map(day => {
+                      const isWeekend = day.date.getDay() === 0 || day.date.getDay() === 6;
+                      const escalaDia = day.isCurrentMonth ? getEscalaOrdenadaParaDia(day.dateStr) : [];
+                      return (
+                        <td
+                          key={day.dateStr}
+                          className={cn(
+                            "calendar-cell border border-slate-800 p-2 align-top text-left relative transition-colors h-28 print:h-auto w-1/7",
+                            isWeekend ? "bg-slate-100/60" : "bg-white",
+                            !day.isCurrentMonth && "bg-slate-50/50"
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              "font-bold text-xs absolute top-1 left-2 select-none",
+                              day.isCurrentMonth ? "text-slate-900" : "text-slate-400"
+                            )}
+                          >
+                            {day.dayNumber}
+                          </span>
+                          {day.isCurrentMonth && escalaDia.length > 0 && (
+                            <div className="mt-5 flex flex-col items-center justify-center gap-1 w-full text-center">
+                              {escalaDia.map((item, idx) => (
+                                <div
+                                  key={idx}
+                                  className="text-[10px] sm:text-xs font-bold text-slate-800 leading-tight"
+                                >
+                                  {item.localNome} - {item.auxiliarNome}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
+
+              {/* Se o calendário tem menos de 6 semanas ou a 6ª semana foi renderizada por completo (tinha dias válidos em Ter-Sab),
+                  então adicionamos a linha de Observações extra abaixo */}
+              {(weeks.length < 6 || (weeks.length > 5 && weeks[5].slice(2).some(d => d.isCurrentMonth))) && (
+                <tr>
+                  <td
+                    colSpan={7}
+                    className="calendar-cell p-3 border border-slate-800 text-left align-top bg-white relative h-20 print:h-auto"
+                  >
+                    <span className="font-bold text-slate-800 text-xs sm:text-sm">Observações:</span>
+                    <p className="mt-1 text-slate-800 text-[10px] sm:text-xs font-semibold leading-relaxed">
+                      Ensaios: Sábados às 17hs. Nos dias de ensaio é necessário o apoio de todos os que estiverem disponíveis. Deus abençoe!
+                    </p>
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>
@@ -480,7 +685,7 @@ export function EscalaView() {
       </section>
 
       {/* Quadro Resumo */}
-      <section className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+      <section className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden no-print">
         <div className="bg-slate-50 px-8 py-4 border-b border-slate-200 flex items-center justify-between">
           <h2 className="text-xs font-black text-slate-500 uppercase tracking-[0.3em]">Quadro Resumo de Atividades (Mês)</h2>
         </div>
@@ -494,7 +699,7 @@ export function EscalaView() {
                     {l.nome}
                   </th>
                 ))}
-                <th className="px-6 py-4 text-[10px] font-black text-blue-600 uppercase tracking-widest text-center border-l border-slate-200 bg-blue-50/50">
+                <th className="px-6 py-4 text-[10px] font-black text-blue-600 uppercase tracking-widest text-center border-l border-slate-200 bg-blue-50/50 print:bg-transparent print:text-slate-800">
                   Total
                 </th>
               </tr>
@@ -508,7 +713,7 @@ export function EscalaView() {
                       {linha.contagemPorLocal[l.id] || 0}
                     </td>
                   ))}
-                  <td className="px-6 py-4 text-center font-bold text-indigo-600 border-l border-slate-100 bg-indigo-50/30">
+                  <td className="px-6 py-4 text-center font-bold text-indigo-600 border-l border-slate-100 bg-indigo-50/30 print:bg-transparent print:text-slate-900">
                     {linha.totalGeral}
                   </td>
                 </tr>

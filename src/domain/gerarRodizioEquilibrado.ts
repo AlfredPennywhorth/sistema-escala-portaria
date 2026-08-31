@@ -187,7 +187,8 @@ function calcularPontuacao(
   itensJaGerados: ItemRodizioSugerido[],
   cargaHistorica: number,
   restricoes: RestricaoInfo[],
-  pesos: ConfiguracaoPesos
+  pesos: ConfiguracaoPesos,
+  mediaIdeal: number
 ): { pontuacao: number; motivos: string[] } {
   const motivos: string[] = [];
   let pontuacao = 0;
@@ -196,13 +197,23 @@ function calcularPontuacao(
   pontuacao += cargaNovo * pesos.pesoNovoRodizio;
   motivos.push(`Carga no novo rodízio: ${cargaNovo} × ${pesos.pesoNovoRodizio} = ${cargaNovo * pesos.pesoNovoRodizio}`);
 
+  // Penalidade drástica para quem ultrapassa a média ideal
+  if (cargaNovo >= Math.floor(mediaIdeal)) {
+    const excesso = cargaNovo - Math.floor(mediaIdeal) + 1;
+    const penalidadeMedia = excesso * pesos.pesoNovoRodizio * 4;
+    pontuacao += penalidadeMedia;
+    motivos.push(`Ultrapassou média ideal (${mediaIdeal.toFixed(1)}): +${penalidadeMedia}`);
+  }
+
   pontuacao += cargaHistorica * pesos.pesoHistorico;
   motivos.push(`Carga histórica: ${cargaHistorica} × ${pesos.pesoHistorico} = ${cargaHistorica * pesos.pesoHistorico}`);
 
   const repeticoesPorta = contarRepeticoesPorta(auxiliar.id, porta, itensJaGerados);
-  pontuacao += repeticoesPorta * pesos.pesoRepeticaoPorta;
   if (repeticoesPorta > 0) {
-    motivos.push(`Repetição na porta: ${repeticoesPorta} × ${pesos.pesoRepeticaoPorta} = ${repeticoesPorta * pesos.pesoRepeticaoPorta}`);
+    // Penalidade quadrática para repetição excessiva de postos
+    const penalidadeRepeticao = Math.pow(repeticoesPorta, 2) * pesos.pesoRepeticaoPorta * 1.5;
+    pontuacao += penalidadeRepeticao;
+    motivos.push(`Repetição na porta: ${repeticoesPorta} (quadrática) = +${penalidadeRepeticao}`);
   }
 
   const ultimaData = getUltimaDataTrabalho(auxiliar.id, itensJaGerados);
@@ -461,6 +472,14 @@ export function gerarRodizioEquilibrado(
     6: 'Sábado',
   };
 
+  const datasEscalaveis = diasDoPeriodo.filter((dia) => {
+    const nomeDia = DIAS_NOMES[dia.getDay()];
+    return diasAtivosSet.has(nomeDia);
+  });
+
+  const totalVagas = datasEscalaveis.length * input.portas.length;
+  const mediaIdeal = totalVagas / input.auxiliares.length;
+
   const cargasHistoricas: Record<string, number> = {};
   for (const auxiliar of input.auxiliares) {
     cargasHistoricas[auxiliar.id] = calcularCargaHistorica(
@@ -469,14 +488,35 @@ export function gerarRodizioEquilibrado(
     );
   }
 
-  for (const dia of diasDoPeriodo) {
-    const dataStr = format(dia, 'yyyy-MM-dd');
-    const nomeDia = DIAS_NOMES[dia.getDay()];
+  // Se houver itens preservados (ex: histórico ou ontem manualmente), injetar
+  if (input.itensPreservados && input.itensPreservados.length > 0) {
+    for (const item of input.itensPreservados) {
+      const auxiliarNome = item.auxiliarNome || input.auxiliares.find(a => a.id === item.auxiliarId)?.nome || 'Preservada';
+      const portaId = input.portas.find(p => normalizarTextoComparacao(p.nome) === normalizarTextoComparacao(item.porta))?.id;
+      itens.push({
+        data: item.data,
+        porta: item.porta,
+        portaId,
+        auxiliarId: item.auxiliarId,
+        auxiliarNome,
+        pontuacao: 0,
+        motivoSelecao: ['Preservado (Realizado no passado / Ajuste manual)'],
+      });
+      if (cargasHistoricas[item.auxiliarId] !== undefined) {
+        cargasHistoricas[item.auxiliarId]++;
+      }
+    }
+  }
 
-    if (!diasAtivosSet.has(nomeDia)) {
+  for (const dia of datasEscalaveis) {
+    const dataStr = format(dia, 'yyyy-MM-dd');
+    
+    // Se a data já possui itens preservados, pular a geração para essa data
+    const diaJaPreenchido = itens.some(item => item.data === dataStr);
+    if (diaJaPreenchido) {
       continue;
     }
-
+    
     const portasDoDia = shuffle([...input.portas]);
 
     for (const porta of portasDoDia) {
@@ -490,7 +530,8 @@ export function gerarRodizioEquilibrado(
             itens,
             cargasHistoricas[auxiliar.id],
             input.restricoes,
-            pesos
+            pesos,
+            mediaIdeal
           );
           return { auxiliar, pontuacao, motivos };
         })
@@ -525,7 +566,7 @@ export function gerarRodizioEquilibrado(
     itens,
     input.auxiliares,
     input.historicoTravado,
-    diasDoPeriodo,
+    datasEscalaveis,
     input.portas
   );
   alertas.push(...alertasGerados);
