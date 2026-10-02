@@ -1,9 +1,19 @@
--- Schema inicial Supabase para o sistema de escala de portaria.
--- Execute este arquivo no SQL Editor do Supabase ou via Supabase CLI.
+-- ============================================================
+-- SCHEMA: sistema-escala-portaria
+-- Criado em: 09 de maio de 2026
+-- ============================================================
 
-create extension if not exists pgcrypto;
+-- ============================================================
+-- EXTENSÕES
+-- ============================================================
+create extension if not exists "uuid-ossp";
 
-create table if not exists public.auxiliares (
+-- ============================================================
+-- TABELAS
+-- ============================================================
+
+-- Tabela: auxiliares
+create table if not exists auxiliares (
   id uuid primary key default gen_random_uuid(),
   nome text not null,
   telefone text,
@@ -13,236 +23,320 @@ create table if not exists public.auxiliares (
   created_at timestamptz default now()
 );
 
-create table if not exists public.restricoes_auxiliares (
+-- Tabela: restricoes_auxiliares
+create table if not exists restricoes_auxiliares (
   id uuid primary key default gen_random_uuid(),
-  auxiliar_id uuid not null references public.auxiliares(id) on delete cascade,
+  auxiliar_id uuid not null references auxiliares(id) on delete cascade,
   data date not null,
   motivo text,
   tipo text not null default 'indisponivel',
   created_at timestamptz default now()
 );
 
-create table if not exists public.rodizios (
+-- Tabela: rodizios
+create table if not exists rodizios (
   id uuid primary key default gen_random_uuid(),
   titulo text not null,
   data_inicio date not null,
   data_fim date not null,
-  status text not null default 'rascunho',
+  status text not null default 'rascunho' check (status in ('rascunho', 'publicado', 'travado', 'cancelado')),
   travado boolean not null default false,
   travado_em timestamptz,
-  observacoes text,
-  created_at timestamptz default now(),
-  constraint rodizios_status_check check (status in ('rascunho', 'publicado', 'travado')),
-  constraint rodizios_datas_check check (data_inicio <= data_fim),
-  constraint rodizios_travado_status_check check ((travado = false) or (status = 'travado'))
-);
-
-create table if not exists public.rodizio_itens (
-  id uuid primary key default gen_random_uuid(),
-  rodizio_id uuid not null references public.rodizios(id) on delete cascade,
-  data date not null,
-  porta text not null,
-  periodo text,
-  auxiliar_id uuid references public.auxiliares(id),
   observacoes text,
   created_at timestamptz default now()
 );
 
-create table if not exists public.usuarios_auxiliares (
+-- Tabela: rodizio_itens
+create table if not exists rodizio_itens (
   id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references auth.users(id) on delete cascade,
-  auxiliar_id uuid references public.auxiliares(id) on delete set null,
-  perfil text not null default 'auxiliar',
-  created_at timestamptz default now(),
-  constraint usuarios_auxiliares_perfil_check check (perfil in ('admin', 'auxiliar')),
-  constraint usuarios_auxiliares_user_id_unique unique (user_id)
+  rodizio_id uuid not null references rodizios(id) on delete cascade,
+  data date not null,
+  porta text not null,
+  periodo text,
+  auxiliar_id uuid references auxiliares(id),
+  observacoes text,
+  created_at timestamptz default now()
 );
 
-create index if not exists rodizio_itens_rodizio_id_idx on public.rodizio_itens(rodizio_id);
-create index if not exists rodizio_itens_auxiliar_id_idx on public.rodizio_itens(auxiliar_id);
-create index if not exists restricoes_auxiliares_auxiliar_id_data_idx on public.restricoes_auxiliares(auxiliar_id, data);
-create index if not exists usuarios_auxiliares_user_id_idx on public.usuarios_auxiliares(user_id);
-create index if not exists usuarios_auxiliares_auxiliar_id_idx on public.usuarios_auxiliares(auxiliar_id);
+-- Tabela: usuarios_auxiliares
+create table if not exists usuarios_auxiliares (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  auxiliar_id uuid references auxiliares(id) on delete set null,
+  perfil text not null default 'auxiliar' check (perfil in ('admin', 'auxiliar', 'coordenadora')),
+  created_at timestamptz default now()
+);
 
-alter table public.auxiliares enable row level security;
-alter table public.restricoes_auxiliares enable row level security;
-alter table public.rodizios enable row level security;
-alter table public.rodizio_itens enable row level security;
-alter table public.usuarios_auxiliares enable row level security;
+-- ============================================================
+-- ÍNDICES
+-- ============================================================
 
-create or replace function public.usuario_atual_e_admin()
+create index if not exists idx_rodizio_itens_rodizio_id on rodizio_itens(rodizio_id);
+create index if not exists idx_rodizio_itens_auxiliar_id on rodizio_itens(auxiliar_id);
+create index if not exists idx_rodizio_itens_data on rodizio_itens(data);
+create index if not exists idx_restricoes_auxiliares_auxiliar_data on restricoes_auxiliares(auxiliar_id, data);
+create index if not exists idx_usuarios_auxiliares_user_id on usuarios_auxiliares(user_id);
+create index if not exists idx_usuarios_auxiliares_auxiliar_id on usuarios_auxiliares(auxiliar_id);
+create index if not exists idx_rodizios_status on rodizios(status);
+create index if not exists idx_rodizios_travado on rodizios(travado);
+
+-- ============================================================
+-- FUNÇÕES AUXILIARES
+-- ============================================================
+
+-- Função: Verifica se o usuário autenticado é admin
+create or replace function is_admin()
 returns boolean
-language sql
-stable
+language plpgsql
 security definer
-set search_path = public
 as $$
-  select exists (
-    select 1
-    from public.usuarios_auxiliares ua
-    where ua.user_id = auth.uid()
-      and ua.perfil = 'admin'
+begin
+  return exists (
+    select 1 from usuarios_auxiliares
+    where user_id = auth.uid()
+      and perfil = 'admin'
   );
+end;
 $$;
 
-create or replace function public.auxiliar_id_do_usuario_atual()
-returns uuid
-language sql
-stable
+-- Função: Verifica se o rodízio está travado
+create or replace function is_rodizio_travado(p_rodizio_id uuid)
+returns boolean
+language plpgsql
 security definer
-set search_path = public
 as $$
-  select ua.auxiliar_id
-  from public.usuarios_auxiliares ua
-  where ua.user_id = auth.uid()
-  limit 1;
+begin
+  return exists (
+    select 1 from rodizios
+    where id = p_rodizio_id
+      and travado = true
+  );
+end;
 $$;
 
--- AUXILIARES
-create policy "admin pode visualizar auxiliares"
-  on public.auxiliares for select
-  using (public.usuario_atual_e_admin());
-
-create policy "admin pode inserir auxiliares"
-  on public.auxiliares for insert
-  with check (public.usuario_atual_e_admin());
-
-create policy "admin pode atualizar auxiliares"
-  on public.auxiliares for update
-  using (public.usuario_atual_e_admin())
-  with check (public.usuario_atual_e_admin());
-
-create policy "admin pode excluir auxiliares"
-  on public.auxiliares for delete
-  using (public.usuario_atual_e_admin());
-
-create policy "auxiliar pode visualizar seus proprios dados"
-  on public.auxiliares for select
-  using (id = public.auxiliar_id_do_usuario_atual());
-
--- RESTRICOES
-create policy "admin pode visualizar restricoes"
-  on public.restricoes_auxiliares for select
-  using (public.usuario_atual_e_admin());
-
-create policy "admin pode inserir restricoes"
-  on public.restricoes_auxiliares for insert
-  with check (public.usuario_atual_e_admin());
-
-create policy "admin pode atualizar restricoes"
-  on public.restricoes_auxiliares for update
-  using (public.usuario_atual_e_admin())
-  with check (public.usuario_atual_e_admin());
-
-create policy "admin pode excluir restricoes"
-  on public.restricoes_auxiliares for delete
-  using (public.usuario_atual_e_admin());
-
-create policy "auxiliar pode visualizar suas restricoes"
-  on public.restricoes_auxiliares for select
-  using (auxiliar_id = public.auxiliar_id_do_usuario_atual());
-
--- RODIZIOS
-create policy "admin pode visualizar rodizios"
-  on public.rodizios for select
-  using (public.usuario_atual_e_admin());
-
-create policy "admin pode inserir rodizios"
-  on public.rodizios for insert
-  with check (public.usuario_atual_e_admin());
-
-create policy "admin pode atualizar rodizios nao travados"
-  on public.rodizios for update
-  using (public.usuario_atual_e_admin() and travado = false)
-  with check (public.usuario_atual_e_admin());
-
-create policy "admin pode excluir rodizios nao travados"
-  on public.rodizios for delete
-  using (public.usuario_atual_e_admin() and travado = false);
-
-create policy "auxiliar pode visualizar rodizios publicados ou travados"
-  on public.rodizios for select
-  using (status in ('publicado', 'travado') or travado = true);
-
--- RODIZIO ITENS
-create policy "admin pode visualizar itens de rodizio"
-  on public.rodizio_itens for select
-  using (public.usuario_atual_e_admin());
-
-create policy "admin pode inserir itens em rodizios nao travados"
-  on public.rodizio_itens for insert
-  with check (
-    public.usuario_atual_e_admin()
-    and exists (
-      select 1
-      from public.rodizios r
-      where r.id = rodizio_id
-        and r.travado = false
-    )
+-- Função: Verifica se o usuário autenticado é coordinador
+create or replace function is_coordenadora()
+returns boolean
+language plpgsql
+security definer
+as $$
+begin
+  return exists (
+    select 1 from usuarios_auxiliares
+    where user_id = auth.uid()
+      and perfil = 'coordenadora'
   );
+end;
+$$;
 
-create policy "admin pode atualizar itens de rodizios nao travados"
-  on public.rodizio_itens for update
+-- ============================================================
+-- ROW LEVEL SECURITY (RLS)
+-- ============================================================
+
+-- Habilitar RLS em todas as tabelas
+alter table auxiliares enable row level security;
+alter table restricoes_auxiliares enable row level security;
+alter table rodizios enable row level security;
+alter table rodizio_itens enable row level security;
+alter table usuarios_auxiliares enable row level security;
+
+-- ============================================================
+-- POLICIES: auxiliares
+-- ============================================================
+
+-- Admin pode fazer tudo em auxiliares
+create policy "Admin pode visualizar auxiliares"
+  on auxiliares for select
+  using (is_admin() = true);
+
+create policy "Admin pode inserir auxiliares"
+  on auxiliares for insert
+  with check (is_admin() = true);
+
+create policy "Admin pode atualizar auxiliares"
+  on auxiliares for update
+  using (is_admin() = true);
+
+create policy "Admin pode excluir auxiliares"
+  on auxiliares for delete
+  using (is_admin() = true);
+
+-- ============================================================
+-- POLICIES: restricoes_auxiliares
+-- ============================================================
+
+-- Admin pode fazer tudo em restrições
+create policy "Admin pode visualizar restrições"
+  on restricoes_auxiliares for select
+  using (is_admin() = true or is_coordenadora() = true);
+
+create policy "Admin pode inserir restrições"
+  on restricoes_auxiliares for insert
+  with check (is_admin() = true or is_coordenadora() = true);
+
+create policy "Admin pode atualizar restrições"
+  on restricoes_auxiliares for update
+  using (is_admin() = true or is_coordenadora() = true);
+
+create policy "Admin pode excluir restrições"
+  on restricoes_auxiliares for delete
+  using (is_admin() = true or is_coordenadora() = true);
+
+-- ============================================================
+-- POLICIES: rodizios
+-- ============================================================
+
+-- Admin pode fazer tudo em rodízios
+create policy "Admin pode visualizar rodízios"
+  on rodizios for select
+  using (is_admin() = true);
+
+create policy "Admin pode inserir rodízios"
+  on rodizios for insert
+  with check (is_admin() = true);
+
+create policy "Admin pode atualizar rodízios"
+  on rodizios for update
   using (
-    public.usuario_atual_e_admin()
-    and exists (
-      select 1
-      from public.rodizios r
-      where r.id = rodizio_id
-        and r.travado = false
-    )
-  )
-  with check (
-    public.usuario_atual_e_admin()
-    and exists (
-      select 1
-      from public.rodizios r
-      where r.id = rodizio_id
-        and r.travado = false
+    is_admin() = true
+    and (
+      -- Admin pode atualizar rodízios não travados
+      travado = false
+      -- Para rodízios travados, apenas updates permittedidos (status) são controlados
     )
   );
 
-create policy "admin pode excluir itens de rodizios nao travados"
-  on public.rodizio_itens for delete
-  using (
-    public.usuario_atual_e_admin()
-    and exists (
-      select 1
-      from public.rodizios r
-      where r.id = rodizio_id
-        and r.travado = false
-    )
-  );
+create policy "Admin pode excluir rodízios rascunho"
+  on rodizios for delete
+  using (is_admin() = true and status = 'rascunho' and travado = false);
 
-create policy "auxiliar pode visualizar itens publicados ou travados"
-  on public.rodizio_itens for select
-  using (
-    exists (
-      select 1
-      from public.rodizios r
-      where r.id = rodizio_id
-        and (r.status in ('publicado', 'travado') or r.travado = true)
-    )
-  );
+-- ============================================================
+-- POLICIES: rodizio_itens
+-- ============================================================
 
--- USUARIOS AUXILIARES
-create policy "admin pode visualizar usuarios auxiliares"
-  on public.usuarios_auxiliares for select
-  using (public.usuario_atual_e_admin());
+-- Admin pode fazer tudo em itens de rodízio
+create policy "Admin pode visualizar itens de rodízio"
+  on rodizio_itens for select
+  using (is_admin() = true);
 
-create policy "admin pode inserir usuarios auxiliares"
-  on public.usuarios_auxiliares for insert
-  with check (public.usuario_atual_e_admin());
+create policy "Admin pode inserir itens de rodízio"
+  on rodizio_itens for insert
+  with check (is_admin() = true);
 
-create policy "admin pode atualizar usuarios auxiliares"
-  on public.usuarios_auxiliares for update
-  using (public.usuario_atual_e_admin())
-  with check (public.usuario_atual_e_admin());
+create policy "Admin pode atualizar itens de rodízio"
+  on rodizio_itens for update
+  using (is_admin() = true and is_rodizio_travado(rodizio_id) = false);
 
-create policy "admin pode excluir usuarios auxiliares"
-  on public.usuarios_auxiliares for delete
-  using (public.usuario_atual_e_admin());
+create policy "Admin pode excluir itens de rodízio"
+  on rodizio_itens for delete
+  using (is_admin() = true and is_rodizio_travado(rodizio_id) = false);
 
-create policy "auxiliar pode visualizar seu proprio vinculo"
-  on public.usuarios_auxiliares for select
-  using (user_id = auth.uid());
+-- ============================================================
+-- POLICIES: usuarios_auxiliares
+-- ============================================================
+
+-- Usuários podem visualizar seus próprios dados
+create policy "Usuários podem visualizar próprios dados"
+  on usuarios_auxiliares for select
+  using (user_id = auth.uid() or is_admin() = true);
+
+-- Admin pode fazer tudo
+create policy "Admin pode inserir usuários"
+  on usuarios_auxiliares for insert
+  with check (is_admin() = true);
+
+create policy "Admin pode atualizar usuários"
+  on usuarios_auxiliares for update
+  using (is_admin() = true);
+
+create policy "Admin pode excluir usuários"
+  on usuarios_auxiliares for delete
+  using (is_admin() = true);
+
+-- ============================================================
+-- COMENTÁRIOS E DOCUMENTAÇÃO
+-- ============================================================
+
+comment on table auxiliares is 'Tabela de cadastro de auxiliares do sistema de rodízio';
+comment on table restricoes_auxiliares is 'Tabela de restrições de disponibilidade das auxiliares';
+comment on table rodizios is 'Tabela de cabeçalhos de rodízio';
+comment on table rodizio_itens is 'Tabela de itens (escala) de cada rodízio';
+comment on table usuarios_auxiliares is 'Tabela de vínculo entre usuário auth e auxiliar';
+
+comment on function is_admin() is 'Verifica se o usuário autenticado possui perfil admin';
+comment on function is_rodizio_travado is 'Verifica se um rodízio específico está travado';
+comment on function is_coordenadora() is 'Verifica se o usuário autenticado possui perfil coordenadora';
+
+-- ============================================================
+-- PROTEÇÃO DE TRAVAMENTO (TRIGGERS)
+-- ============================================================
+
+-- Função para prevenir alterações em rodízios travados
+create or replace function proteger_rodizio_travado()
+returns trigger
+language plpgsql
+security definer
+as $$
+begin
+  -- Verifica se o rodízio está travado
+  if exists (
+    select 1 from rodizios
+    where id = coalesce(NEW.id, OLD.id)
+      and travado = true
+  ) then
+    raise exception 'Rodízio travado não pode ser alterado. Use-o como histórico para equilíbrio das próximas escalas.';
+  end if;
+  return coalesce(NEW, OLD);
+end;
+$$;
+
+-- Trigger para UPDATE em rodizios
+drop trigger if exists trg_proteger_rodizio_travado_update on rodizios;
+create trigger trg_proteger_rodizio_travado_update
+  before update on rodizios
+  for each row
+  execute function proteger_rodizio_travado();
+
+-- Trigger para DELETE em rodizios
+drop trigger if exists trg_proteger_rodizio_travado_delete on rodizios;
+create trigger trg_proteger_rodizio_travado_delete
+  before delete on rodizios
+  for each row
+  execute function proteger_rodizio_travado();
+
+-- Função para prevenir alterações em itens de rodízio travado
+create or replace function proteger_itens_rodizio_travado()
+returns trigger
+language plpgsql
+security definer
+as $$
+begin
+  -- Verifica se o rodízio pai está travado
+  if exists (
+    select 1 from rodizios r
+    join rodizio_itens ri on ri.rodizio_id = r.id
+    where ri.id = coalesce(NEW.id, OLD.id)
+      and r.travado = true
+  ) then
+    raise exception 'Itens de rodízio travado não podem ser alterados.';
+  end if;
+  return coalesce(NEW, OLD);
+end;
+$$;
+
+-- Trigger para UPDATE em rodizio_itens
+drop trigger if exists trg_proteger_itens_rodizio_travado_update on rodizio_itens;
+create trigger trg_proteger_itens_rodizio_travado_update
+  before update on rodizio_itens
+  for each row
+  execute function proteger_itens_rodizio_travado();
+
+-- Trigger para DELETE em rodizio_itens
+drop trigger if exists trg_proteger_itens_rodizio_travado_delete on rodizio_itens;
+create trigger trg_proteger_itens_rodizio_travado_delete
+  before delete on rodizio_itens
+  for each row
+  execute function proteger_itens_rodizio_travado();
+
+comment on function proteger_rodizio_travado() is 'Impede UPDATE e DELETE em rodízios travados';
+comment on function proteger_itens_rodizio_travado() is 'Impede UPDATE e DELETE em itens de rodízio travado';

@@ -41,7 +41,107 @@ body {
     display: none !important;
   }
   
+  @page {
+    size: A4 landscape;
+    margin: 5mm;
+  }
+
   body {
-    background-color: white;
+    background-color: white !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Reset de layout e sombras */
+  .shadow-xl, .shadow-sm, .shadow-lg {
+    box-shadow: none !important;
+  }
+
+  .rounded-3xl, .rounded-2xl, .rounded-xl {
+    border-radius: 4px !important;
+  }
+
+  /* Compactar a área principal */
+  .print-container {
+    width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Tabelas mais compactas */
+  table {
+    table-layout: fixed;
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+
+  th, td {
+    padding: 4px 6px !important;
+    font-size: 9px !important;
+    line-height: 1.2 !important;
+    border: 1px solid #cbd5e1 !important;
+  }
+
+  th {
+    background-color: #f1f5f9 !important;
+    color: black !important;
+  }
+
+  /* Estilos específicos para a tabela do calendário na impressão */
+  .calendar-table {
+    border: 2px solid #000000 !important;
+  }
+
+  .calendar-table th {
+    background-color: #0b2c5c !important;
+    color: white !important;
+    font-weight: bold !important;
+    font-size: 11px !important;
+    border: 1.5px solid #000000 !important;
+  }
+
+  .calendar-cell {
+    height: auto !important;
+    min-height: 15mm !important;
+    border: 1.5px solid #000000 !important;
+    font-size: 9px !important;
+    padding: 4px !important;
+    background-color: white !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .calendar-cell.bg-slate-100\/60 {
+    background-color: #f1f5f9 !important; /* fundo cinza claro para fins de semana na impressão */
+  }
+
+  .calendar-cell.bg-slate-50\/50 {
+    background-color: #fafafa !important; /* preenchimento de outros meses */
+  }
+
+  tr {
+    page-break-inside: avoid;
+  }
+
+  /* Ajustes específicos do cabeçalho */
+  .print-header-compact {
+    padding: 0 0 10px 0 !important;
+    margin-bottom: 10px !important;
+    border-bottom: 2px solid #334155 !important;
+  }
+
+  .print-header-compact img {
+    height: 50px !important;
+  }
+
+  .print-header-compact h1 {
+    font-size: 20px !important;
+    margin: 0 !important;
+  }
+
+  /* Garantir que o resumo não quebre em lugares ruins */
+  section {
+    page-break-before: auto;
+    margin-bottom: 0px !important;
   }
 }

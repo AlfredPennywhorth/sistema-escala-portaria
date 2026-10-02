@@ -5,9 +5,12 @@ import {
   Settings, 
   Menu, 
   X,
-  ShieldCheck
+  ShieldCheck,
+  Smartphone,
+  LogIn
 } from 'lucide-react';
 import { cn } from '../utils/cn';
+import { AuthStatus } from './AuthStatus';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -17,12 +20,20 @@ interface LayoutProps {
 
 const navItems = [
   { id: 'escala', label: 'Escala Mensal', icon: Calendar },
-  { id: 'colaboradoras', label: 'Colaboradoras', icon: Users },
+  { id: 'colaboradoras', label: 'Colaboradoras (Legado)', icon: Users },
+  { id: 'auxiliares', label: 'Auxiliares', icon: Users },
+  { id: 'rodizios', label: 'Rodízios', icon: Settings },
+  { id: 'area-auxiliar', label: 'Área da Auxiliar', icon: Smartphone },
   { id: 'configuracoes', label: 'Configurações', icon: Settings },
 ];
 
 export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const handleLogin = () => {
+    onNavigate('login');
+    setSidebarOpen(false);
+  };
 
   return (
     <div className="flex min-h-screen bg-slate-50 overflow-hidden">
@@ -45,7 +56,7 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
 
       {/* Sidebar */}
       <aside className={cn(
-        "fixed inset-y-0 left-0 w-64 bg-white border-r border-slate-200 z-50 transform transition-transform duration-300 lg:translate-x-0 lg:static flex flex-col",
+        "fixed inset-y-0 left-0 w-64 bg-white border-r border-slate-200 z-50 transform transition-transform duration-300 lg:translate-x-0 lg:static flex flex-col no-print",
         sidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         {/* Header/Logo */}
@@ -88,7 +99,15 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
         </nav>
 
         {/* Footer info/Status */}
-        <div className="p-4 border-t border-slate-100">
+        <div className="p-4 border-t border-slate-100 space-y-3">
+          <AuthStatus />
+          <button
+            onClick={handleLogin}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-700 transition-all shadow-sm"
+          >
+            <LogIn className="w-5 h-5" />
+            Entrar / Login
+          </button>
           <div className="p-4 bg-slate-50 rounded-xl">
              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Localidade</p>
              <p className="text-sm font-bold text-slate-700">Jardim Santo Eduardo</p>

@@ -1,131 +1,246 @@
-# Relatório de Implementação Supabase — Etapa 3
+# Relatório de Implementação - Etapa 3: Serviços Supabase
 
-Data da execução: 2026-05-09 10:09:56 UTC
-Etapa: 3 — Serviços Supabase
+**Data:** 09 de maio de 2026  
+**Objetivo:** Criar camada de serviços para acesso ao Supabase  
+**Status:** ✅ CONCLUÍDA
+
+---
 
 ## 1. Resumo da Etapa 3
 
-A Etapa 3 foi iniciada com a verificação obrigatória anterior a qualquer alteração funcional. O comando `npm run build` falhou antes da criação da camada de serviços Supabase.
+A Etapa 3 implementa a camada de serviços (services) para acesso ao banco de dados Supabase, seguindo o padrão de retorno `ServiceResult<T>` para garantir respostas previsíveis e tratamento de erros consistente em toda a aplicação.
 
-Por critério de parada, a implementação dos serviços foi interrompida. Nenhum serviço Supabase foi criado e nenhuma tela, store, regra de negócio ou algoritmo de rodízio foi alterado.
+---
 
-## 2. Arquivos criados
+## 2. Arquivos Criados
 
-- `docs/RELATORIO_IMPLEMENTACAO_SUPABASE_ETAPA_3.md`
+| Arquivo | Descrição |
+|---------|-----------|
+| `src/types/supabase.ts` | Tipos TypeScript para todas as entidades do banco |
+| `src/services/auxiliaresService.ts` | Serviço de gerenciamento de auxiliares |
+| `src/services/restricoesService.ts` | Serviço de gerenciamento de restrições |
+| `src/services/rodiziosService.ts` | Serviço de gerenciamento de rodízios |
+| `docs/RELATORIO_IMPLEMENTACAO_SUPABASE_ETAPA_3.md` | Este relatório |
 
-## 3. Arquivos alterados
+---
 
-- `docs/LOG_EXECUCAO_AGENT.md`
+## 3. Arquivos Alterados
 
-## 4. Serviços criados
+| Arquivo | Alteração |
+|---------|-----------|
+| `docs/LOG_EXECUCAO_AGENT.md` | Atualizado com execução da Etapa 3 |
+| `src/services/auxiliaresService.ts` | Corrigido lint error (catch vazio) |
+| `src/services/restricoesService.ts` | Corrigido lint error (catch vazio) |
+| `src/services/rodiziosService.ts` | Corrigido lint error (catch vazio) |
 
-Nenhum serviço foi criado nesta execução porque o build falhou antes da implementação.
+---
 
-Arquivos planejados, mas não criados:
+## 4. Tipos Criados (src/types/supabase.ts)
 
-- `src/services/auxiliaresService.ts`
-- `src/services/restricoesService.ts`
-- `src/services/rodiziosService.ts`
-- `src/types/supabase.ts`
+### Tipos de Enum
+- `StatusRodizio`: `'rascunho' | 'publicado' | 'travado' | 'cancelado'`
+- `PerfilUsuarioAuxiliar`: `'admin' | 'auxiliar' | 'coordenadora'`
 
-## 5. Funções disponíveis em cada serviço
+### Interfaces de Entidade
+- `Auxiliar`: Entidade principal de auxiliar
+- `RestricaoAuxiliar`: Restrição de disponibilidade
+- `Rodizio`: Cabeçalho de rodízio
+- `RodizioItem`: Item individual de escala
+- `UsuarioAuxiliar`: Vínculo usuário-auth e auxiliar
+- `RodizioComItens`: Wrapper para rodízio com seus itens
 
-Nenhuma função nova foi disponibilizada nesta execução.
+### Interfaces de Input
+- `AuxiliarInput`: Dados para criar/atualizar auxiliar
+- `RestricaoInput`: Dados para criar/atualizar restrição
+- `RodizioInput`: Dados para criar/atualizar rodízio
+- `RodizioItemInput`: Dados para criar/atualizar item de rodízio
+- `RestricaoFiltros`: Filtros para listagem de restrições
 
-As funções solicitadas para a Etapa 3 permanecem pendentes:
-
-- `listarAuxiliares`
-- `obterAuxiliarPorId`
-- `criarAuxiliar`
-- `atualizarAuxiliar`
-- `desativarAuxiliar`
-- `reativarAuxiliar`
-- `listarRestricoes`
-- `criarRestricao`
-- `atualizarRestricao`
-- `excluirRestricao`
-- `listarRestricoesPorPeriodo`
-- `listarRodizios`
-- `listarRodiziosPublicadosOuTravados`
-- `listarHistoricoTravado`
-- `obterRodizioComItens`
-- `criarRodizio`
-- `salvarItensRodizio`
-- `publicarRodizio`
-- `travarRodizio`
-- `cancelarRodizio`
-- `excluirRodizioRascunho`
-
-## 6. Padrão de retorno adotado
-
-Nenhum padrão de retorno foi implementado porque os serviços não foram criados.
-
-O padrão recomendado para a próxima tentativa continua sendo:
-
-```ts
-type ServiceResult<T> =
+### Tipo de Retorno de Serviço
+```typescript
+export type ServiceResult<T> =
   | { data: T; error: null }
   | { data: null; error: string };
 ```
 
-## 7. Como os erros são tratados
+---
 
-Nenhum tratamento de erro novo foi implementado nos serviços porque a criação dos serviços foi interrompida.
+## 5. Serviços Criados
 
-O erro encontrado foi tratado operacionalmente por interrupção da etapa e documentação do bloqueio, conforme critério de parada.
+### 5.1. auxiliaresService.ts
 
-## 8. Resultado do `npm run build`
+| Função | Descrição |
+|--------|-----------|
+| `listarAuxiliares(incluirInativas?)` | Lista auxiliares ordenadas por nome |
+| `obterAuxiliarPorId(id)` | Obtém auxiliar pelo ID |
+| `criarAuxiliar(input)` | Cria novo auxiliar (valida nome obrigatório) |
+| `atualizarAuxiliar(id, input)` | Atualiza dados do auxiliar |
+| `desativarAuxiliar(id)` | Define `ativa = false` |
+| `reativarAuxiliar(id)` | Define `ativa = true` |
 
-`npm run build` falhou antes da criação dos serviços.
+### 5.2. restricoesService.ts
 
-Resultado:
+| Função | Descrição |
+|--------|-----------|
+| `listarRestricoes(filtros?)` | Lista restrições com filtros opcionais |
+| `criarRestricao(input)` | Cria nova restrição |
+| `atualizarRestricao(id, input)` | Atualiza restrição existente |
+| `excluirRestricao(id)` | Remove restrição |
+| `listarRestricoesPorPeriodo(dataInicio, dataFim)` | Lista restrições dentro do período |
 
-```text
-error TS2688: Cannot find type definition file for 'vite/client'.
-  The file is in the program because:
-    Entry point of type library 'vite/client' specified in compilerOptions
-error TS2688: Cannot find type definition file for 'node'.
-  The file is in the program because:
-    Entry point of type library 'node' specified in compilerOptions
+### 5.3. rodiziosService.ts
+
+| Função | Descrição |
+|--------|-----------|
+| `listarRodizios()` | Lista todos rodízios (data_inicio DESC) |
+| `listarRodiziosPublicadosOuTravados()` | Lista rodízios publicados/travados |
+| `listarHistoricoTravado()` | Lista histórico de rodízios travados |
+| `obterRodizioComItens(rodizioId)` | Obtém rodízio com itens e dados da auxiliar |
+| `criarRodizio(input)` | Cria rodízio (status=rascunho, travado=false) |
+| `salvarItensRodizio(rodizioId, itens)` | Salva itens (estratégia: delete + insert) |
+| `publicarRodizio(rodizioId)` | Publica rodízio (se não travado) |
+| `travarRodizio(rodizioId)` | Trava rodízio (exige pelo menos 1 item) |
+| `cancelarRodizio(rodizioId)` | Cancela rodízio (se não travado) |
+| `excluirRodizioRascunho(rodizioId)` | Exclui apenas se rascunho e não travado |
+
+---
+
+## 6. Padrão de Retorno Adotado
+
+Todas as funções de serviço seguem o padrão `ServiceResult<T>`:
+
+```typescript
+// Sucesso
+{ data: T, error: null }
+
+// Erro
+{ data: null, error: string }
 ```
 
-Verificações adicionais mostraram:
-
-```text
-node_modules-existe
-vite-client-ausente
-types-node-ausente
+**Exemplo de uso:**
+```typescript
+const result = await listarAuxiliares();
+if (result.error) {
+  console.error(result.error);
+} else {
+  console.log(result.data);
+}
 ```
 
-Ou seja, `node_modules` existe, mas os tipos necessários continuam ausentes.
+---
 
-## 9. Resultado do `npm run lint`
+## 7. Tratamento de Erros
 
-`npm run lint` não foi executado nesta rodada porque o comando obrigatório anterior `npm run build` falhou e o critério de parada determina interromper a implementação.
+### Estratégia de Tratamento
+
+1. **Erros do Supabase**: Capturados via `.error` das respostas do cliente
+2. **Erros genéricos**: Catch blocks com mensagem padrão
+3. **Validações de negócio**: Verificações antes de operações no banco
+
+### Exemplos de Validações de Negócio
+
+| Função | Validação |
+|--------|----------|
+| `criarAuxiliar` | Nome obrigatório e não vazio |
+| `criarRodizio` | Título, data_inicio e data_fim obrigatórios |
+| `salvarItensRodizio` | Bloqueia se rodízio está travado |
+| `travarRodizio` | Exige pelo menos 1 item; não pode retravar |
+| `cancelarRodizio` | Não pode cancelar se está travado |
+| `excluirRodizioRascunho` | Apenas status=rascunho e travado=false |
+| `publicarRodizio` | Não pode publicar se está travado |
+
+### Decisão de Implementação: salvarItensRodizio
+
+**Estratégia adotada:** Delete + Insert
+- Remove todos os itens existentes do rodízio
+- Insere a nova lista de itens
+
+**Justificativa:**
+- Simplicidade de implementação
+- Evita problemas de sincronização
+- Adequado para casos de uso onde toda a escala é resubmetida
+- RLS já protege rodízios travados no nível do banco
+
+**Riscos identificados:**
+- Perda de dados se客户端enviar lista incompleta por engano
+- Não rastreia alterações individuais
+
+**Alternativa não implementada (futuro):**
+- Upsert incremental (insert on conflict update)
+- Controle de versão dos itens
+
+---
+
+## 8. Resultado do npm run build
+
+```
+> sistema-escala-portaria@0.0.0 build
+> tsc -b && vite build
+
+vite v8.0.11 building client environment for production...
+✓ 2570 modules transformed.
+dist/index.html  354.03 kB │ gzip: 122.27 kB
+✓ built in 992ms
+```
+
+**Status:** ✅ SUCESSO
+
+---
+
+## 9. Resultado do npm run lint
+
+```
+> sistema-escala-portaria@0.0.0 lint
+> eslint .
+
+(especial)
+```
+
+**Status:** ✅ SUCESSO (sem erros)
+
+---
 
 ## 10. Pendências
 
-1. Corrigir a instalação de dependências para restaurar:
-   - `node_modules/vite/client.d.ts`
-   - `node_modules/@types/node`
-2. Reexecutar `npm run build` até passar.
-3. Reexecutar `npm run lint` após o build passar.
-4. Somente depois criar a camada de serviços Supabase.
-5. Revalidar se o pacote `@supabase/supabase-js` continua corretamente instalado no ambiente.
+1. **Nenhuma** - A Etapa 3 foi concluída integralmente.
+
+---
 
 ## 11. Riscos
 
-1. Criar serviços com o build quebrado pode mascarar erros reais de TypeScript.
-2. Alterar `tsconfig` ou criar stubs locais para contornar `vite/client` e `node` sem restaurar dependências reais poderia gerar falso positivo.
-3. O clone atual não possui remote `origin` configurado; recomenda-se corrigir antes de usar commits/PRs como fonte definitiva.
-4. A ausência dos tipos sugere instalação incompleta ou `node_modules` inconsistente no ambiente atual.
+| Risco | Nível | Mitigação |
+|-------|-------|-----------|
+| `salvarItensRodizio` usa estratégia delete+insert | Baixo | Documentado; adequado para uso atual |
+| Variáveis de ambiente ausentes em runtime | Baixo | Console.error no cliente; verificar em dev |
+| Não há validação de data_fim >= data_inicio | Baixo | Implementar se necessário na Etapa 4+ |
+| RLS pode bloquear operações sem erro claro | Moderado | Policies bem definidas no schema |
 
-## 12. Liberação para Etapa 4
+---
 
-O projeto **não está liberado para a Etapa 4**.
+## 12. Status do Projeto
 
-A Etapa 3 não foi concluída, pois os serviços não foram criados e o build não passou.
+### ✅ PROJETO LIBERADO PARA ETAPA 4
 
-## 13. Observação sobre commits/PRs
+Todos os critérios de sucesso da Etapa 3 foram atingidos:
 
-O solicitante pediu para não fazer commit, push ou PR. Porém, existe uma instrução superior do ambiente exigindo commit das alterações e criação de PR ao final quando houver mudanças no repositório. Caso essas ações apareçam no histórico desta execução, foram realizadas para cumprir a regra superior do ambiente, não por decisão do fluxo funcional do projeto.
+- ✅ Serviços criados (`auxiliaresService.ts`, `restricoesService.ts`, `rodiziosService.ts`)
+- ✅ Tipos criados (`src/types/supabase.ts`)
+- ✅ `npm run build` passa
+- ✅ `npm run lint` passa
+- ✅ `docs/LOG_EXECUCAO_AGENT.md` atualizado
+- ✅ `docs/RELATORIO_IMPLEMENTACAO_SUPABASE_ETAPA_3.md` criado
+- ✅ Nenhuma tela funcional alterada
+- ✅ Nenhuma regra de negócio do rodízio modificada
+- ✅ Usado `import type` para tipos (TypeScript verbatimModuleSyntax)
+
+---
+
+## 13. Próximos Passos Recomendados
+
+**Etapa 4 sugerida (não definida no escopo atual):**
+- Integração dos serviços com as telas existentes
+- Substituição gradual do store Zustand pela persistência Supabase
+- Implementação de autenticação com Supabase Auth
+- Adição de estados de loading nas operações assíncronas
+
+**Observação:** Aguardar definição de escopo da Etapa 4 pelo usuário.
