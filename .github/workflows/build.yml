@@ -1,0 +1,41 @@
+name: Build and Update HTML
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'src/**'
+      - 'package.json'
+      - 'vite.config.ts'
+      - '.github/workflows/**'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build
+        run: npm run build
+
+      - name: Update HTML file
+        run: |
+          cp dist/index.html CLIQUE_AQUI_ABRIR_ESCALA.html
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add CLIQUE_AQUI_ABRIR_ESCALA.html
+          git commit -m "chore: auto-build HTML file [skip ci]" || echo "No changes to commit"
+          git push
