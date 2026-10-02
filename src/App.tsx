@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Layout } from './components/Layout';
 import { EscalaView } from './components/EscalaView';
 import { ColaboradorasManager } from './components/ColaboradorasManager';
@@ -9,9 +9,16 @@ import { AuxiliaresAdmin } from './components/AuxiliaresAdmin';
 import { ConfigCheck } from './components/ConfigCheck';
 import { LoginPage } from './components/LoginPage';
 import { useAuth } from './hooks/useAuth';
+import { useStore } from './store/useStore';
 
 export function App() {
-  const { loading } = useAuth();
+  const { loading, usuario } = useAuth();
+  const carregarDadosNativos = useStore((s) => s.carregarDadosNativos);
+
+  useEffect(() => {
+    carregarDadosNativos();
+  }, [carregarDadosNativos, usuario]);
+
   const [currentPage, setCurrentPage] = useState('escala');
 
   if (loading) {
