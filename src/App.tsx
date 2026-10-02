@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Layout } from './components/Layout';
 import { EscalaView } from './components/EscalaView';
 import { ColaboradorasManager } from './components/ColaboradorasManager';
@@ -13,6 +13,13 @@ import { useAuth } from './hooks/useAuth';
 export function App() {
   const { loading } = useAuth();
   const [currentPage, setCurrentPage] = useState('escala');
+
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash && hash.includes('type=recovery')) {
+      setCurrentPage('login');
+    }
+  }, []);
 
   if (loading) {
     return (

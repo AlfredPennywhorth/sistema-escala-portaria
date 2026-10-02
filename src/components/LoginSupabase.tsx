@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { Mail, Lock, Send, Loader2, X } from 'lucide-react';
 import clsx from 'clsx';
@@ -123,9 +123,13 @@ export function LoginSupabase({ onClose, compact = false }: LoginSupabaseProps) 
     }
   };
 
-  // Se a URL tiver access_token e type=recovery, o supabase auth vai logar o usuário
-  // e podemos mostrar a tela de atualizar senha se quisermos. O ideal seria detectar
-  // esse estado, mas por simplicidade deixaremos a opção manual ou guiada.
+  // Detecta se a URL possui o token de recuperação
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash && hash.includes('type=recovery')) {
+      setModo('atualizar');
+    }
+  }, []);
 
   return (
     <div className={clsx(compact ? "bg-white rounded-xl p-4 shadow-lg" : "min-h-screen flex items-center justify-center bg-gray-100 p-4")}>
