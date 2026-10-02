@@ -176,6 +176,7 @@ export function AuxiliaresAdmin() {
   }
 
   function atualizarNovaRestricao(campo: string, valor: string | number | null) {
+    setErro(null);
     setRestricoesModal(prev => ({
       ...prev,
       novaRestricao: { ...prev.novaRestricao, [campo]: valor },
@@ -202,8 +203,8 @@ export function AuxiliaresAdmin() {
       input.dia_semana = dia_semana;
     } else if (data) {
       input.data = data;
-    } else {
-      setErro('Informe a data ou selecione o dia da semana');
+    } else if (!porta) {
+      setErro('Informe a data, o dia da semana ou o local da restrição');
       return;
     }
 
@@ -412,6 +413,24 @@ export function AuxiliaresAdmin() {
             </div>
 
             <div className="p-6 space-y-6">
+              {erro && (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-red-500 mt-0.5 shrink-0" />
+                  <div className="flex-1">
+                    <p className="font-medium text-red-800">Erro</p>
+                    <p className="text-sm text-red-600">{erro}</p>
+                  </div>
+                  <button onClick={() => setErro(null)} className="text-red-700 font-medium">✕</button>
+                </div>
+              )}
+
+              {sucesso && (
+                <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex items-center gap-3">
+                  <Check className="w-5 h-5 text-green-500" />
+                  <p className="text-green-700 font-medium">{sucesso}</p>
+                </div>
+              )}
+
               <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-700">
                 <p className="font-medium mb-1">Como cadastrar restrições:</p>
                 <ul className="list-disc list-inside space-y-1">
@@ -419,6 +438,7 @@ export function AuxiliaresAdmin() {
                   <li><strong>Evitar:</strong> Penalidade se escaladar neste dia/local.</li>
                   <li><strong>Preferência:</strong> Bônus se escaladar neste dia/local.</li>
                 </ul>
+                <p className="mt-2 text-xs italic">* Para bloquear a auxiliar em um local em <strong>todos os dias</strong>, deixe a data e o dia da semana vazios.</p>
               </div>
 
               <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
@@ -510,7 +530,7 @@ export function AuxiliaresAdmin() {
                               ? `Todo ${DIAS_SEMANA[r.dia_semana as keyof typeof DIAS_SEMANA]}`
                               : r.data 
                                 ? format(parseISO(r.data), 'dd/MM/yyyy')
-                                : 'Sem data'}
+                                : 'Sempre'}
                             {r.porta && ` - ${r.porta}`}
                           </p>
                           {r.motivo && <p className="text-xs mt-1 opacity-75">{r.motivo}</p>}

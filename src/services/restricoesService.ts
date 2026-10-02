@@ -78,8 +78,8 @@ export async function criarRestricao(input: RestricaoInput): Promise<ServiceResu
     return { data: null, error: 'Auxiliar é obrigatória' };
   }
 
-  if (!input.data && input.dia_semana === undefined) {
-    return { data: null, error: 'Informe a data ou o dia da semana para a restrição' };
+  if (!input.data && input.dia_semana === undefined && !input.porta) {
+    return { data: null, error: 'Informe a data, o dia da semana ou a porta para a restrição' };
   }
 
   try {
