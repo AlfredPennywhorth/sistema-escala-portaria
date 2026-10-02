@@ -20,7 +20,6 @@ interface LayoutProps {
 
 const navItems = [
   { id: 'escala', label: 'Escala Mensal', icon: Calendar },
-  { id: 'colaboradoras', label: 'Colaboradoras (Legado)', icon: Users },
   { id: 'auxiliares', label: 'Auxiliares', icon: Users },
   { id: 'rodizios', label: 'Rodízios', icon: Settings },
   { id: 'area-auxiliar', label: 'Área da Auxiliar', icon: Smartphone },
