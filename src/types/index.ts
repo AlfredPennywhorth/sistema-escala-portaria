@@ -1,16 +1,6 @@
 export type DiaSemana = 'Domingo' | 'Segunda-Feira' | 'Terça-Feira' | 'Quarta-Feira' | 'Quinta-Feira' | 'Sexta-Feira' | 'Sábado';
 
-export interface Restricao {
-  dia?: DiaSemana[];
-  local?: string[];
-}
 
-export interface Colaboradora {
-  id: string;
-  nome: string;
-  restricoes: Restricao;
-  cargaAcumulada: number; // Histórico permanente de turnos
-}
 
 export interface Local {
   id: string;
