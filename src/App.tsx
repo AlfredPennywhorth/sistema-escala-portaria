@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Layout } from './components/Layout';
 import { EscalaView } from './components/EscalaView';
-import { ColaboradorasManager } from './components/ColaboradorasManager';
 import { Configuracoes } from './components/Configuracoes';
 import { RodizioAdmin } from './components/RodizioAdmin';
 import { AreaAuxiliarMobile } from './components/mobile/AreaAuxiliarMobile';
@@ -38,8 +37,6 @@ export function App() {
         return <LoginPage />;
       case 'escala':
         return <EscalaView />;
-      case 'colaboradoras':
-        return <ColaboradorasManager />;
       case 'rodizios':
         return <RodizioAdmin />;
       case 'auxiliares':

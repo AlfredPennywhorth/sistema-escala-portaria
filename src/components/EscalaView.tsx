@@ -140,6 +140,7 @@ export function EscalaView() {
   const [erroSupabase, setErroSupabase] = useState<string | null>(null);
   const [itemSupabase, setItemSupabase] = useState<RodizioComItens | null>(null);
   const [auxiliaresSupabase, setAuxiliaresSupabase] = useState<Record<string, string>>({});
+  const [listaAuxiliares, setListaAuxiliares] = useState<Auxiliar[]>([]);
   const [origemEscala, setOrigemEscala] = useState<string | null>(null);
   const [infoOrigem, setInfoOrigem] = useState<string | null>(null);
   const [recalculando, setRecalculando] = useState(false);
@@ -175,6 +176,7 @@ export function EscalaView() {
       
       const resAuxiliares = await auxiliaresService.listarAuxiliares();
       if (resAuxiliares.data) {
+        setListaAuxiliares(resAuxiliares.data);
         resAuxiliares.data.forEach((a: Auxiliar) => {
           novoMapaNomes[a.id] = a.nome;
         });
@@ -431,8 +433,8 @@ export function EscalaView() {
       }
     });
 
-    // 2. Garantir que todas as auxiliares da store apareçam (mesmo que zeradas) sem duplicar por nome
-    colaboradoras.forEach(c => {
+    // 2. Garantir que todas as auxiliares ATIVAS do Supabase apareçam (mesmo que zeradas) sem duplicar por nome
+    listaAuxiliares.filter(a => a.ativa).forEach(c => {
       obterOuCriarLinha(c.nome);
     });
 
