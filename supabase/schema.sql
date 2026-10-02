@@ -191,6 +191,15 @@ create policy "Admin pode visualizar rodízios"
   on rodizios for select
   using (is_admin() = true);
 
+-- Auxiliares autenticados podem ver rodízios publicados ou travados
+create policy "Auxiliares podem visualizar rodízios publicados"
+  on rodizios for select
+  using (
+    (status = 'publicado' or status = 'travado')
+    and auth.role() = 'authenticated'
+    and exists (select 1 from usuarios_auxiliares where user_id = auth.uid())
+  );
+
 create policy "Admin pode inserir rodízios"
   on rodizios for insert
   with check (is_admin() = true);
@@ -218,6 +227,19 @@ create policy "Admin pode excluir rodízios rascunho"
 create policy "Admin pode visualizar itens de rodízio"
   on rodizio_itens for select
   using (is_admin() = true);
+
+-- Auxiliares autenticados podem ver os itens de rodízios publicados ou travados
+create policy "Auxiliares podem visualizar itens de rodízios publicados"
+  on rodizio_itens for select
+  using (
+    auth.role() = 'authenticated'
+    and exists (select 1 from usuarios_auxiliares where user_id = auth.uid())
+    and exists (
+      select 1 from rodizios r 
+      where r.id = rodizio_id 
+      and (r.status = 'publicado' or r.status = 'travado')
+    )
+  );
 
 create policy "Admin pode inserir itens de rodízio"
   on rodizio_itens for insert
