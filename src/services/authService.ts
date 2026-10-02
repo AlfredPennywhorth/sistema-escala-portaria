@@ -116,6 +116,81 @@ export async function enviarMagicLink(email: string, redirectTo?: string): Promi
   }
 }
 
+export async function cadastrarComEmailSenha(email: string, senha: string): Promise<ServiceResult<AuthUser>> {
+  if (!email || email.trim() === '') {
+    return { data: null, error: 'Email é obrigatório' };
+  }
+
+  if (!senha || senha.length < 6) {
+    return { data: null, error: 'Senha deve ter pelo menos 6 caracteres' };
+  }
+
+  try {
+    const { data, error } = await supabase.auth.signUp({
+      email: email.trim(),
+      password: senha,
+    });
+
+    if (error) {
+      return { data: null, error: error.message };
+    }
+
+    if (!data.user) {
+      return { data: null, error: 'Falha ao criar conta' };
+    }
+
+    const authUser: AuthUser = {
+      id: data.user.id,
+      email: data.user.email ?? '',
+      email_confirmed_at: data.user.email_confirmed_at ?? null,
+      created_at: data.user.created_at ?? new Date().toISOString(),
+      updated_at: data.user.updated_at ?? new Date().toISOString(),
+    };
+
+    return { data: authUser, error: null };
+  } catch {
+    return { data: null, error: 'Erro ao cadastrar' };
+  }
+}
+
+export async function recuperarSenha(email: string, redirectTo?: string): Promise<ServiceResult<null>> {
+  if (!email || email.trim() === '') {
+    return { data: null, error: 'Email é obrigatório' };
+  }
+
+  try {
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: redirectTo || window.location.origin,
+    });
+
+    if (error) {
+      return { data: null, error: error.message };
+    }
+
+    return { data: null, error: null };
+  } catch {
+    return { data: null, error: 'Erro ao solicitar recuperação' };
+  }
+}
+
+export async function atualizarSenha(novaSenha: string): Promise<ServiceResult<null>> {
+  if (!novaSenha || novaSenha.length < 6) {
+    return { data: null, error: 'A nova senha deve ter pelo menos 6 caracteres' };
+  }
+
+  try {
+    const { error } = await supabase.auth.updateUser({ password: novaSenha });
+
+    if (error) {
+      return { data: null, error: error.message };
+    }
+
+    return { data: null, error: null };
+  } catch {
+    return { data: null, error: 'Erro ao atualizar senha' };
+  }
+}
+
 export async function obterPerfilUsuarioAtual(): Promise<ServiceResult<UsuarioPerfil | null>> {
   try {
     const { data: sessionData, error: sessionError } = await supabase.auth.getSession();

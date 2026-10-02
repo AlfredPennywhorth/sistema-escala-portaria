@@ -13,6 +13,9 @@ interface UseAuthReturn {
   login: (email: string, senha: string) => Promise<{ error: string | null }>;
   logout: () => Promise<{ error: string | null }>;
   enviarMagicLink: (email: string) => Promise<{ error: string | null }>;
+  cadastrar: (email: string, senha: string) => Promise<{ error: string | null }>;
+  recuperarSenha: (email: string) => Promise<{ error: string | null }>;
+  atualizarSenha: (novaSenha: string) => Promise<{ error: string | null }>;
   recarregar: () => Promise<void>;
 }
 
@@ -99,6 +102,21 @@ export function useAuth(): UseAuthReturn {
     return { error: result.error };
   }, []);
 
+  const cadastrar = useCallback(async (email: string, senha: string) => {
+    const result = await authService.cadastrarComEmailSenha(email, senha);
+    return { error: result.error };
+  }, []);
+
+  const recuperarSenha = useCallback(async (email: string) => {
+    const result = await authService.recuperarSenha(email);
+    return { error: result.error };
+  }, []);
+
+  const atualizarSenha = useCallback(async (novaSenha: string) => {
+    const result = await authService.atualizarSenha(novaSenha);
+    return { error: result.error };
+  }, []);
+
   return {
     usuario,
     perfil,
@@ -109,6 +127,9 @@ export function useAuth(): UseAuthReturn {
     login,
     logout,
     enviarMagicLink,
+    cadastrar,
+    recuperarSenha,
+    atualizarSenha,
     recarregar: carregarSessao,
   };
 }
