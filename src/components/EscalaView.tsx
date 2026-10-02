@@ -127,7 +127,6 @@ const getCalendarRows = (month: number, year: number): CalendarDay[][] => {
 
 export function EscalaView() {
   const { 
-    colaboradoras, 
     locais, 
     escalas, 
     setEscalas, 
@@ -282,8 +281,7 @@ export function EscalaView() {
       const itensPreservados = escalas
         .filter(item => item.data < hojeStr)
         .map(item => {
-          const colaborador = colaboradoras.find(c => c.id === item.colaboradoraId);
-          const auxiliarNome = colaborador?.nome || 'Preservada';
+          const auxiliarNome = auxiliaresSupabase[item.colaboradoraId] || 'Preservada';
           const local = locais.find(l => l.id === item.localId);
           const localNome = local?.nome || item.localId;
           return {
@@ -362,13 +360,12 @@ export function EscalaView() {
     escalas.forEach(t => {
       if (!agrupado[t.data]) agrupado[t.data] = {};
       
-      const nomeStore = colaboradoras.find(c => c.id === t.colaboradoraId)?.nome;
       const nomeSupabase = auxiliaresSupabase[t.colaboradoraId];
       
-      agrupado[t.data][t.localId] = nomeStore || nomeSupabase || '-';
+      agrupado[t.data][t.localId] = nomeSupabase || '-';
     });
     return agrupado;
-  }, [escalas, colaboradoras, auxiliaresSupabase]);
+  }, [escalas, auxiliaresSupabase]);
 
   const getEscalaOrdenadaParaDia = useCallback((dataStr: string) => {
     const escalaDia = escalaPorData[dataStr];
@@ -422,9 +419,7 @@ export function EscalaView() {
 
     // 1. Processar itens consolidados (Supabase)
     escalas.forEach(item => {
-      const nomeStore = colaboradoras.find(c => c.id === item.colaboradoraId)?.nome;
-      const nomeSupabase = auxiliaresSupabase[item.colaboradoraId];
-      const nome = nomeStore || nomeSupabase;
+      const nome = auxiliaresSupabase[item.colaboradoraId];
       
       if (nome) {
         const linha = obterOuCriarLinha(nome);
@@ -451,7 +446,7 @@ export function EscalaView() {
     console.debug("[EscalaView] linhas resumo:", resultado.length);
 
     return resultado;
-  }, [escalas, colaboradoras, locais, auxiliaresSupabase]);
+  }, [escalas, locais, auxiliaresSupabase, listaAuxiliares]);
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 print-container print:space-y-4">

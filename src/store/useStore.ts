@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Colaboradora, Local, Turno, DiaSemana } from '../types';
+import type { Local, Turno, DiaSemana } from '../types';
 
 interface AppState {
   locais: Local[];
