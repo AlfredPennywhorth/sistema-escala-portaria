@@ -1,4 +1,8 @@
-# React + TypeScript + Vite
+# Sistema de Escala de Portaria
+
+> **Nota:** Consulte o [Plano de Implementação de Melhorias](./PLANO_DE_MELHORIAS.md) para os próximos passos de evolução (Roteamento, Build e Testes).
+
+## React + TypeScript + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
