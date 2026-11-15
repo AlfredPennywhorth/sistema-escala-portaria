@@ -82,7 +82,7 @@ export async function listarEscalasPublicadasOuTravadasPorAuxiliar(
       return { data: [], error: null };
     }
 
-    const rodizioIds = rodiziosData.map(r => r.id);
+    const rodizioIds = rodiziosData.map((r: Pick<Rodizio, 'id'>) => r.id);
 
     const { data: itensData, error: itensError } = await criarClienteNeon()
       .from('rodizio_itens')
@@ -94,8 +94,8 @@ export async function listarEscalasPublicadasOuTravadasPorAuxiliar(
       return { data: null, error: itensError.message };
     }
 
-    const rodiziosComItem = new Set(itensData?.map(i => i.rodizio_id) || []);
-    const rodiziosFiltrados = rodiziosData.filter(r => rodiziosComItem.has(r.id));
+    const rodiziosComItem = new Set(itensData?.map((i: Pick<RodizioItem, 'rodizio_id'>) => i.rodizio_id) || []);
+    const rodiziosFiltrados = rodiziosData.filter((r: Pick<Rodizio, 'id'>) => rodiziosComItem.has(r.id));
 
     return { data: rodiziosFiltrados as Rodizio[], error: null };
   } catch {
