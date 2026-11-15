@@ -5,7 +5,10 @@ import { createClient, SupabaseAuthAdapter } from '@neondatabase/neon-js';
  * Não é usado pela aplicação publicada até homologação e autorização.
  * Nunca passe DATABASE_URL ou credenciais PostgreSQL para o frontend.
  */
+let clienteNeon: ReturnType<typeof createClient> | null = null;
+
 export function criarClienteNeon() {
+  if (clienteNeon) return clienteNeon;
   const authUrl = import.meta.env.VITE_NEON_AUTH_URL;
   const dataApiUrl = import.meta.env.VITE_NEON_DATA_API_URL;
 
@@ -13,7 +16,7 @@ export function criarClienteNeon() {
     throw new Error('Configure VITE_NEON_AUTH_URL e VITE_NEON_DATA_API_URL para habilitar a homologação Neon');
   }
 
-  return createClient({
+  clienteNeon = createClient({
     auth: {
       url: authUrl,
       adapter: SupabaseAuthAdapter(),
@@ -23,4 +26,5 @@ export function criarClienteNeon() {
       url: dataApiUrl,
     },
   });
+  return clienteNeon;
 }
