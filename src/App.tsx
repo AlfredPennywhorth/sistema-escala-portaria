@@ -8,8 +8,9 @@ import { AuxiliaresAdmin } from './components/AuxiliaresAdmin';
 import { ConfigCheck } from './components/ConfigCheck';
 import { LoginPage } from './components/LoginPage';
 import { useAuth } from './hooks/useAuth';
+import { NeonAuthHomologacao } from './components/NeonAuthHomologacao';
 
-export function App() {
+function AppPrincipal() {
   const { loading } = useAuth();
   const [currentPage, setCurrentPage] = useState(() => window.location.hash.includes('type=recovery') ? 'login' : 'escala');
 
@@ -51,6 +52,15 @@ export function App() {
       <ConfigCheck />
     </>
   );
+}
+
+// Só habilita a tela isolada em build de homologação com configuração explícita.
+// Sem esta variável, o runtime Supabase original continua em uso.
+export function App() {
+  if (import.meta.env.VITE_NEON_HOMOLOGACAO_ENABLED === 'true') {
+    return <NeonAuthHomologacao />;
+  }
+  return <AppPrincipal />;
 }
 
 export default App;
