@@ -28,5 +28,13 @@ jobs:
           VITE_SUPABASE_PUBLISHABLE_KEY: test-public-key
           VITE_NEON_AUTH_URL: https://example.neonauth.neon.tech/auth
           VITE_NEON_DATA_API_URL: https://example.apirest.neon.tech/rest/v1
+      - name: Build isolated Neon authentication homologation screen
+        run: npm run build
+        env:
+          VITE_NEON_HOMOLOGACAO_ENABLED: 'true'
+          VITE_NEON_AUTH_URL: https://example.neonauth.neon.tech/auth
+          VITE_NEON_DATA_API_URL: https://example.apirest.neon.tech/rest/v1
+          VITE_SUPABASE_URL: https://example.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: test-public-key
       - name: ESLint
         run: npm run lint
