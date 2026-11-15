@@ -36,5 +36,10 @@ jobs:
           VITE_NEON_DATA_API_URL: https://example.apirest.neon.tech/rest/v1
           VITE_SUPABASE_URL: https://example.supabase.co
           VITE_SUPABASE_PUBLISHABLE_KEY: test-public-key
+      - name: Cloudflare Pages isolated homologation build
+        run: npm run build:cloudflare-homologacao
+        env:
+          CF_PAGES: '1'
+          CF_PAGES_BRANCH: chore/neon-migration-prep-20261115
       - name: ESLint
         run: npm run lint
