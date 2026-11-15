@@ -102,13 +102,44 @@ export function obterPerfilTexto(perfil: PerfilUsuario | null | undefined): stri
 }
 
 /**
- * PENDENTES: magic link (o SupabaseAuthAdapter usa OTP por e-mail),
- * cadastro administrativo, recuperação e atualização de senha.
- * Não simular sucesso nem acionar um fluxo diferente do exibido ao usuário.
+ * Solicitação de código OTP por e-mail para a conta previamente provisionada.
+ * O SupabaseAuthAdapter do Neon implementa signInWithOtp por e-mail como OTP,
+ * não como link mágico. O retorno sem erro confirma apenas o pedido ao provedor,
+ * não a entrega da mensagem ou o login.
+ */
+export async function solicitarCodigoEmail(email: string): Promise<ServiceResult<null>> {
+  if (!email.trim()) return { data: null, error: 'Informe o e-mail' };
+  try {
+    const { error } = await criarClienteNeon().auth.signInWithOtp({ email: email.trim() });
+    return { data: null, error: error?.message ?? null };
+  } catch {
+    return { data: null, error: 'Falha ao solicitar código de autenticação por e-mail' };
+  }
+}
+
+export async function confirmarCodigoEmail(email: string, codigo: string): Promise<ServiceResult<AuthUser>> {
+  if (!email.trim() || !codigo.trim()) return { data: null, error: 'Informe e-mail e código' };
+  try {
+    const { data, error } = await criarClienteNeon().auth.verifyOtp({
+      email: email.trim(),
+      token: codigo.trim(),
+      type: 'email',
+    });
+    if (error) return { data: null, error: error.message };
+    if (!data.user) return { data: null, error: 'O provedor não confirmou a identidade após o código' };
+    return { data: mapearUsuario(data.user), error: null };
+  } catch {
+    return { data: null, error: 'Falha ao validar o código de autenticação' };
+  }
+}
+
+/**
+ * Fluxos ainda não homologados: link mágico e recuperação/troca de senha.
+ * Não tratar um código OTP como magic link nem afirmar envio sem testar a caixa postal.
  */
 export async function enviarMagicLink(_email: string): Promise<ServiceResult<null>> {
   void _email;
-  return { data: null, error: 'Magic link Neon ainda não homologado' };
+  return { data: null, error: 'Magic link Neon ainda não homologado; use código por e-mail no piloto' };
 }
 
 export async function cadastrarComEmailSenha(_email: string, _senha: string): Promise<ServiceResult<AuthUser>> {
