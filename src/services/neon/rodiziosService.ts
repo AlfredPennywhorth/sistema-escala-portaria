@@ -1,6 +1,7 @@
 import { criarClienteNeon } from '../../lib/neon';
 import type {
   Rodizio,
+  Auxiliar,
   RodizioItem,
   RodizioInput,
   RodizioItemInput,
