@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { loginComEmailSenha, logout } from '../services/neon/authService';
+import { confirmarCodigoEmail, loginComEmailSenha, logout, solicitarCodigoEmail } from '../services/neon/authService';
 import { verificarNeonPilot, verificarLeituraEscalasNeon } from '../services/neonPilotService';
 
 /**
@@ -9,6 +9,7 @@ import { verificarNeonPilot, verificarLeituraEscalasNeon } from '../services/neo
 export function NeonAuthHomologacao() {
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
+  const [codigo, setCodigo] = useState('');
   const [ocupado, setOcupado] = useState(false);
   const [mensagem, setMensagem] = useState('');
   const [resumo, setResumo] = useState<string | null>(null);
@@ -87,6 +88,44 @@ export function NeonAuthHomologacao() {
             Entrar com Neon Auth
           </button>
         </form>
+        <section className="mt-5 rounded-md border border-blue-100 bg-blue-50 p-4">
+          <h2 className="text-sm font-semibold text-slate-900">Acesso de teste por código de e-mail</h2>
+          <p className="mt-1 text-xs text-slate-700">Para a conta previamente cadastrada. Solicitar não comprova entrega; informe o código recebido para confirmar a sessão.</p>
+          <button
+            type="button"
+            className="mt-3 w-full rounded-md border border-blue-600 px-4 py-3 text-blue-800 disabled:opacity-50"
+            disabled={ocupado || !email.trim()}
+            onClick={() => void executar(async () => {
+              const retorno = await solicitarCodigoEmail(email);
+              setMensagem(retorno.error || 'Pedido enviado ao provedor. Confira a caixa postal e o spam; o recebimento ainda não foi confirmado.');
+            })}
+          >Solicitar código por e-mail</button>
+          <label className="mt-3 block text-sm font-medium text-slate-700" htmlFor="neon-codigo">Código recebido</label>
+          <input
+            id="neon-codigo"
+            className="mt-1 w-full rounded-md border border-slate-300 p-3"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            value={codigo}
+            onChange={(e) => setCodigo(e.target.value)}
+            placeholder="Código de verificação"
+          />
+          <button
+            type="button"
+            className="mt-3 w-full rounded-md bg-blue-700 px-4 py-3 text-white disabled:opacity-50"
+            disabled={ocupado || !email.trim() || !codigo.trim()}
+            onClick={() => void executar(async () => {
+              const retorno = await confirmarCodigoEmail(email, codigo);
+              setCodigo('');
+              if (retorno.error) {
+                setMensagem(retorno.error);
+                return;
+              }
+              setMensagem('Código aceito pelo provedor. Verifique sua sessão e seu perfil.');
+              await conferirSessao();
+            })}
+          >Confirmar código e entrar</button>
+        </section>
         <div className="mt-4 grid gap-2">
           <button
             type="button"
