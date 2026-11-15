@@ -1,0 +1,32 @@
+name: Neon Migration Branch Check
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'package.json'
+      - 'tsconfig*.json'
+      - '.github/workflows/neon-pr-check.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Typecheck and build (without production credentials)
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: https://example.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: test-public-key
+          VITE_NEON_AUTH_URL: https://example.neonauth.neon.tech/auth
+          VITE_NEON_DATA_API_URL: https://example.apirest.neon.tech/rest/v1
+      - name: ESLint
+        run: npm run lint
