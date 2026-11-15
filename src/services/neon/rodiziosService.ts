@@ -83,7 +83,7 @@ export async function obterRodizioComItens(rodizioId: string): Promise<ServiceRe
       return { data: null, error: itensError.message };
     }
 
-    const formattedItens = (itensData || []).map(item => ({
+    const formattedItens = (itensData || []).map((item: RodizioItem & { auxiliar?: Auxiliar | Auxiliar[] }) => ({
       ...item,
       auxiliar: Array.isArray(item.auxiliar) ? item.auxiliar[0] : item.auxiliar,
     }));
@@ -116,7 +116,7 @@ export async function listarRodiziosTravadosComItens(): Promise<ServiceResult<Hi
       return { data: [], error: null };
     }
 
-    const rodizioIds = rodizios.map(r => r.id);
+    const rodizioIds = rodizios.map((r: Rodizio) => r.id);
     const { data: itensData, error: itensError } = await criarClienteNeon()
       .from('rodizio_itens')
       .select('*')
@@ -142,7 +142,7 @@ export async function listarRodiziosTravadosComItens(): Promise<ServiceResult<Hi
       }
     }
 
-    const result: HistoricoRodizioComItens[] = rodizios.map(r => ({
+    const result: HistoricoRodizioComItens[] = rodizios.map((r: Rodizio) => ({
       id: r.id,
       titulo: r.titulo,
       dataInicio: r.data_inicio,
@@ -469,7 +469,7 @@ export async function buscarRodizioPorMesAno(ano: number, mes: number): Promise<
       return { data: null, error: itensError.message };
     }
 
-    const formattedItens = (itensData || []).map(item => ({
+    const formattedItens = (itensData || []).map((item: RodizioItem & { auxiliar?: Auxiliar | Auxiliar[] }) => ({
       ...item,
       auxiliar: Array.isArray(item.auxiliar) ? item.auxiliar[0] : item.auxiliar,
     }));
