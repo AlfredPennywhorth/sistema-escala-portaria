@@ -140,7 +140,9 @@ export function NeonAuthHomologacao() {
             onClick={() => void executar(async () => {
               const retorno = await verificarLeituraEscalasNeon();
               setResumo(null);
-              setMensagem(retorno.erro || `Consulta permitida: ${retorno.dados?.length ?? 0} escala(s)`);
+              setMensagem(retorno.erro || ((retorno.dados?.length ?? 0) === 0
+                ? 'Nenhuma escala visível para esta sessão. A consulta não retornou registros.'
+                : `Consulta retornou ${retorno.dados?.length ?? 0} escala(s) visível(is) para esta sessão.`));
             })}
           >Testar acesso às escalas</button>
           <button
