@@ -41,3 +41,9 @@ Não aprovar a migração nem a PR #2 antes de concluir AUT-05B, revisar políti
 - A captura de `Sem vínculo` não comprova a negativa de consulta nessa condição; AUT-05B-02 segue **pendente**.
 
 **AUT-05B-01 concluído; AUT-05B-02 a 07 pendentes**, inclusive teste multi-dispositivo, quando aplicável. Sem promoção para produção.
+
+## AUT-05B-02 — Provisionamento para teste sem vínculo (16/11/2026)
+- Conta alternativa autorizada pelo responsável foi provisionada **somente** na branch Neon `br-late-night-b6pydxvn`, sob apelido `teste-sem-vinculo-02`.
+- Neon Auth retornou criação com sucesso; consulta de confirmação encontrou `emailVerified=false` e **0 registros** em `public.usuarios_auxiliares` para essa identidade.
+- Nenhum papel administrativo foi concedido e nenhuma vinculação foi criada. E-mail não é registrado no repositório.
+- **Status do caso:** preparado, mas ainda **não executado** com sessão e JWT dessa conta. Usuário deve receber e confirmar seu próprio OTP e verificar perfil e leitura RLS pela interface.
