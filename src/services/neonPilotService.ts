@@ -72,10 +72,10 @@ export async function verificarPermissoesAuxiliarNeon() {
   const erro = rodizios.error?.message || auxiliares.error?.message || restricoes.error?.message;
   if (erro) return { erro, dados: null };
 
-  const escalas = rodizios.data ?? [];
+  const escalas: Array<{ status: string }> = rodizios.data ?? [];
   const publicadas = escalas.filter((v) => v.status === 'publicado' || v.status === 'travado').length;
   const rascunhos = escalas.filter((v) => v.status === 'rascunho').length;
-  const auxiliaresVisiveis = auxiliares.data ?? [];
+  const auxiliaresVisiveis: Array<{ id: string }> = auxiliares.data ?? [];
   const propriaAuxiliar = Boolean(perfil.data?.auxiliar_id
     && auxiliaresVisiveis.some((v) => v.id === perfil.data?.auxiliar_id));
   return {
