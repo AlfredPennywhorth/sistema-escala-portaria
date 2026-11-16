@@ -31,3 +31,13 @@ Registrar data, ambiente, commit, conta sintética identificada por apelido, ope
 
 ## Gate de liberação
 Não aprovar a migração nem a PR #2 antes de concluir AUT-05B, revisar políticas com testes de escrita e executar CI/build do branch de homologação. Não efetuar merge na master sem autorização expressa.
+
+## Resultado de campo AUT-05B-01 — 16/11/2026, 07:49–07:50 (horário do aparelho)
+**APROVADO: encerramento de sessão e bloqueio da consulta posterior**, conforme seis capturas fornecidas pelo responsável.
+- Antes do encerramento, sessão do perfil `auxiliar` permitiu consulta de duas escalas (`publicado` e `travado`), sem rascunhos; apenas a própria auxiliar visível.
+- Ao acionar **Encerrar sessão**, a interface apresentou `Logout confirmado: a verificação posterior não encontrou sessão autenticada. Teste agora o acesso às escalas.`
+- Na tentativa de leitura posterior, a Data API retornou `AuthRequiredError: Authentication required. A valid token is needed to access the resource.` Não houve exibição das duas escalas.
+- A mensagem comprova ausência de credencial válida nessa requisição. O código HTTP exato não foi capturado, e o teste **não comprova revogação de JWT previamente copiado nem encerramento em outros dispositivos**.
+- A captura de `Sem vínculo` não comprova a negativa de consulta nessa condição; AUT-05B-02 segue **pendente**.
+
+**AUT-05B-01 concluído; AUT-05B-02 a 07 pendentes**, inclusive teste multi-dispositivo, quando aplicável. Sem promoção para produção.
