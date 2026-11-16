@@ -168,7 +168,20 @@ export function NeonAuthHomologacao() {
               const retorno = await logout();
               setResumo(null);
               setSenha('');
-              setMensagem(retorno.error || 'Logout solicitado. Verifique novamente a sessão.');
+              if (retorno.error) {
+                setMensagem('Não foi possível confirmar o encerramento: ' + retorno.error);
+                return;
+              }
+              const verificacao = await verificarNeonPilot();
+              if (verificacao.conectado || verificacao.usuario) {
+                setMensagem('ATENÇÃO: sessão ainda identificada após o logout. Não considerar o teste aprovado.');
+                return;
+              }
+              if (verificacao.erro === 'Sessão autenticada obrigatória') {
+                setMensagem('Logout confirmado: a verificação posterior não encontrou sessão autenticada. Teste agora o acesso às escalas.');
+              } else {
+                setMensagem('Logout enviado, mas a verificação posterior não foi conclusiva: ' + (verificacao.erro || 'estado desconhecido'));
+              }
             })}
           >Encerrar sessão</button>
         </div>
