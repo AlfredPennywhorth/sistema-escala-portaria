@@ -45,3 +45,48 @@ export async function verificarLeituraEscalasNeon() {
     erro: resultado.error?.message ?? null,
   };
 }
+
+
+/**
+ * Inspeção SOMENTE de leitura para a homologação do perfil auxiliar.
+ * Todos os resultados vêm da Data API usando a sessão do navegador e RLS.
+ * Um resultado vazio não equivale a uma prova de que um HTTP 403 ocorreu.
+ */
+export async function verificarPermissoesAuxiliarNeon() {
+  const cliente = criarClienteNeon();
+  const sessao = await cliente.auth.getSession();
+  if (sessao.error) return { erro: sessao.error.message, dados: null };
+  if (!sessao.data.session?.user) return { erro: 'Sessão autenticada obrigatória', dados: null };
+
+  const perfil = await cliente.from('usuarios_auxiliares')
+    .select('perfil,auxiliar_id')
+    .eq('user_id', sessao.data.session.user.id)
+    .maybeSingle();
+  if (perfil.error) return { erro: perfil.error.message, dados: null };
+
+  const [rodizios, auxiliares, restricoes] = await Promise.all([
+    cliente.from('rodizios').select('id,status,travado').limit(20),
+    cliente.from('auxiliares').select('id').limit(20),
+    cliente.from('restricoes_auxiliares').select('id').limit(20),
+  ]);
+  const erro = rodizios.error?.message || auxiliares.error?.message || restricoes.error?.message;
+  if (erro) return { erro, dados: null };
+
+  const escalas = rodizios.data ?? [];
+  const publicadas = escalas.filter((v) => v.status === 'publicado' || v.status === 'travado').length;
+  const rascunhos = escalas.filter((v) => v.status === 'rascunho').length;
+  const auxiliaresVisiveis = auxiliares.data ?? [];
+  const propriaAuxiliar = Boolean(perfil.data?.auxiliar_id
+    && auxiliaresVisiveis.some((v) => v.id === perfil.data?.auxiliar_id));
+  return {
+    erro: null,
+    dados: {
+      perfil: perfil.data?.perfil ?? 'Sem vínculo',
+      escalasPublicadasOuTravadas: publicadas,
+      rascunhosVisiveis: rascunhos,
+      auxiliaresVisiveis: auxiliaresVisiveis.length,
+      propriaAuxiliarVisivel: propriaAuxiliar,
+      restricoesVisiveis: (restricoes.data ?? []).length,
+    },
+  };
+}
