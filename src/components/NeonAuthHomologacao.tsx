@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { confirmarCodigoEmail, loginComEmailSenha, logout, solicitarCodigoEmail } from '../services/neon/authService';
-import { verificarNeonPilot, verificarLeituraEscalasNeon } from '../services/neonPilotService';
+import { verificarNeonPilot, verificarLeituraEscalasNeon, verificarPermissoesAuxiliarNeon } from '../services/neonPilotService';
 
 /**
  * Tela apenas para ambiente isolado com VITE_NEON_HOMOLOGACAO_ENABLED=true.
@@ -145,6 +145,21 @@ export function NeonAuthHomologacao() {
                 : `Consulta retornou ${retorno.dados?.length ?? 0} escala(s) visível(is) para esta sessão.`));
             })}
           >Testar acesso às escalas</button>
+          <button
+            type="button"
+            className="rounded-md border border-slate-300 px-4 py-3 text-slate-800 disabled:opacity-50"
+            disabled={ocupado}
+            onClick={() => void executar(async () => {
+              const retorno = await verificarPermissoesAuxiliarNeon();
+              if (retorno.erro) {
+                setResumo(null);
+                setMensagem(retorno.erro);
+                return;
+              }
+              setMensagem('Resultado de leitura RLS com sua sessão. Os campos abaixo mostram registros visíveis, não privilégios administrativos.');
+              setResumo(JSON.stringify(retorno.dados, null, 2));
+            })}
+          >Homologar permissões de Auxiliar</button>
           <button
             type="button"
             className="rounded-md border border-slate-300 px-4 py-3 text-slate-800 disabled:opacity-50"
