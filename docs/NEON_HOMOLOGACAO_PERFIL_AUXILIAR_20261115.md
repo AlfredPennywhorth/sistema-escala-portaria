@@ -31,3 +31,16 @@ A tela de homologação incorpora o botão **Homologar permissões de Auxiliar**
 - Criar fixtures sintéticas de restrições na branch de teste e testar leitura/gravação negativa por auxiliar em transações revertidas.
 - Validar por sessão autenticada os perfis `coordenadora` e `admin`, com aprovação específica de cada permissão. Registrar eventuais diferenças de RLS.
 - Não executar merge/produção; a PR #2 permanece draft.
+
+## Resultado de campo — 15/11/2026, 22h58–22h59 (hora local)
+
+**AUT-05A: PARCIALMENTE APROVADO, com divergência no diagnóstico de escalas.** O responsável enviou cinco capturas:
+- Código OTP aceito e sessão autenticada. Uma captura inicial mostra «Sem vínculo», mas a captura subsequente da mesma rodada identifica corretamente «auxiliar», compatível com a atualização de vínculo na branch Neon.
+- Consulta simples «Testar acesso às escalas»: **2 registros visíveis**, exatamente os rodízios fictícios publicados/travados.
+- Consulta detalhada «Homologar permissões de Auxiliar»: `perfil=auxiliar`, `escalasPublicadasOuTravadas=0` (**diverge da consulta simples**), `rascunhosVisiveis=0`, `auxiliaresVisiveis=1`, `propriaAuxiliarVisivel=true`, `restricoesVisiveis=0`.
+
+**Conclusão:** perfil e leitura do próprio cadastro confirmados; rascunho não exibido; **contagem detalhada de rodízios NÃO APROVADA**. Não há evidência suficiente para afirmar falha na policy RLS, pois outra consulta autenticada ao mesmo banco retornou os dois rodízios esperados. Uma hipótese de diferença entre requisições, campos selecionados ou concorrência requer reteste.
+
+Correção investigativa implementada em `src/services/neonPilotService.ts`: consulta detalhada reutiliza exatamente `verificarLeituraEscalasNeon()`, executa as demais consultas sequencialmente e mostra `escalasConsultadas` e `statusEscalasVisiveis` para permitir comparação. **Ainda depende de novo build Cloudflare e reteste mobile antes de aprovar AUT-05A.**
+
+Não compartilhar códigos OTP, tokens JWT ou outras credenciais. Nenhum privilégio admin/coordenadora será concedido até solucionar a divergência.
