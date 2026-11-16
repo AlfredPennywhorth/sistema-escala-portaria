@@ -14,7 +14,7 @@ Evidência: captura de tela enviada pelo responsável pela homologação em 15/1
 **Alcance:** login por código recebido no celular; consulta à sessão e ausência de perfil administrativo. Não equivale a comprovar leitura RLS positiva, revogação de sessão, recuperação de senha, magic link ou login por senha.
 
 ## Casos seguintes (não aprovados ainda)
-- AUT-02: sem vínculo, clicar em «Testar acesso às escalas»: resultado esperado **zero registros**, sem exposição de dados sintéticos (a resposta «Consulta permitida: 0 escala(s)» precisa ser interpretada como operação de leitura sob RLS, não permissão de perfil). Registrar mensagem exata.
+- **AUT-02: APROVADO quanto ao resultado sem dados visíveis.** Captura mobile enviada pelo responsável em 15/11/2026 mostra `Consulta permitida: 0 escala(s)` após login da conta sem vínculo; a branch possui 3 rodízios fictícios. A requisição não retornou registros para essa sessão. **Limitação:** essa evidência de interface não substitui a inspeção do status HTTP e do JWT nas chamadas da Data API. A expressão «Consulta permitida» foi corrigida no frontend para evitar confusão.
 - AUT-03: clicar em «Encerrar sessão», depois «Verificar sessão e perfil»: deve indicar «Sessão autenticada obrigatória».
 - AUT-04: tentar «Testar acesso às escalas» sem sessão: precisa ser negado ou não retornar registros, conforme política configurada; verificar também código HTTP quando houver acesso a logs.
 - AUT-05: testar sessões reais e autorização de quatro perfis, com permissões positivas e negativas.
