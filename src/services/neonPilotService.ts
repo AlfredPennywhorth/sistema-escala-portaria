@@ -64,15 +64,17 @@ export async function verificarPermissoesAuxiliarNeon() {
     .maybeSingle();
   if (perfil.error) return { erro: perfil.error.message, dados: null };
 
-  const [rodizios, auxiliares, restricoes] = await Promise.all([
-    cliente.from('rodizios').select('id,status,travado').limit(20),
-    cliente.from('auxiliares').select('id').limit(20),
-    cliente.from('restricoes_auxiliares').select('id').limit(20),
-  ]);
-  const erro = rodizios.error?.message || auxiliares.error?.message || restricoes.error?.message;
-  if (erro) return { erro, dados: null };
+  // Reaproveitar EXATAMENTE a mesma consulta do teste de escalas já validado
+  // no celular. Executar os SELECTs sequencialmente para isolar possíveis
+  // diferenças de autenticação/requisição ao investigar divergências.
+  const rodizios = await verificarLeituraEscalasNeon();
+  if (rodizios.erro) return { erro: rodizios.erro, dados: null };
+  const auxiliares = await cliente.from('auxiliares').select('id').limit(20);
+  if (auxiliares.error) return { erro: auxiliares.error.message, dados: null };
+  const restricoes = await cliente.from('restricoes_auxiliares').select('id').limit(20);
+  if (restricoes.error) return { erro: restricoes.error.message, dados: null };
 
-  const escalas: Array<{ status: string }> = rodizios.data ?? [];
+  const escalas: Array<{ status: string }> = rodizios.dados ?? [];
   const publicadas = escalas.filter((v) => v.status === 'publicado' || v.status === 'travado').length;
   const rascunhos = escalas.filter((v) => v.status === 'rascunho').length;
   const auxiliaresVisiveis: Array<{ id: string }> = auxiliares.data ?? [];
@@ -82,6 +84,8 @@ export async function verificarPermissoesAuxiliarNeon() {
     erro: null,
     dados: {
       perfil: perfil.data?.perfil ?? 'Sem vínculo',
+      escalasConsultadas: escalas.length,
+      statusEscalasVisiveis: escalas.map((v) => v.status),
       escalasPublicadasOuTravadas: publicadas,
       rascunhosVisiveis: rascunhos,
       auxiliaresVisiveis: auxiliaresVisiveis.length,
