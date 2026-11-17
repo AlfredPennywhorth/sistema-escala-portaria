@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { confirmarCodigoEmail, loginComEmailSenha, logout, solicitarCodigoEmail } from '../services/neon/authService';
 import { verificarNeonPilot, verificarLeituraEscalasNeon, verificarPermissoesAuxiliarNeon } from '../services/neonPilotService';
+import { verificarEscritaRestricoesNeon } from '../services/neonWriteAuditService';
 
 /**
  * Tela apenas para ambiente isolado com VITE_NEON_HOMOLOGACAO_ENABLED=true.
@@ -126,6 +127,11 @@ export function NeonAuthHomologacao() {
             })}
           >Confirmar código e entrar</button>
         </section>
+        <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950">
+          Teste controlado somente em homologação: tenta criar uma restrição fictícia.
+          Auxiliar deve receber bloqueio; Coordenadora deve conseguir criar e excluir.
+          O resultado indica se a limpeza foi confirmada.
+        </p>
         <div className="mt-4 grid gap-2">
           <button
             type="button"
@@ -160,6 +166,23 @@ export function NeonAuthHomologacao() {
               setResumo(JSON.stringify(retorno.dados, null, 2));
             })}
           >Homologar permissões de Auxiliar</button>
+          <button
+            type="button"
+            className="rounded-md border border-amber-600 bg-amber-50 px-4 py-3 text-amber-950 disabled:opacity-50"
+            disabled={ocupado}
+            onClick={() => void executar(async () => {
+              const retorno = await verificarEscritaRestricoesNeon();
+              if (retorno.erro) {
+                setResumo(null);
+                setMensagem(retorno.erro);
+                return;
+              }
+              setMensagem(retorno.dados?.resultado === 'aprovado'
+                ? 'Teste de escrita RLS aprovado. Confira o resultado e a limpeza abaixo.'
+                : 'Teste de escrita RLS não aprovado ou inconclusivo. Verifique os detalhes.');
+              setResumo(JSON.stringify(retorno.dados, null, 2));
+            })}
+          >Testar escrita RLS — restrições (HML)</button>
           <button
             type="button"
             className="rounded-md border border-slate-300 px-4 py-3 text-slate-800 disabled:opacity-50"
