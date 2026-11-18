@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { confirmarCodigoEmail, loginComEmailSenha, logout, solicitarCodigoEmail } from '../services/neon/authService';
 import { verificarNeonPilot, verificarLeituraEscalasNeon, verificarPermissoesAuxiliarNeon } from '../services/neonPilotService';
 import { verificarEscritaRestricoesNeon } from '../services/neonWriteAuditService';
+import { verificarProtecaoHistoricoNeon } from '../services/neonHistoricoAuditService';
 
 /**
  * Tela apenas para ambiente isolado com VITE_NEON_HOMOLOGACAO_ENABLED=true.
@@ -183,6 +184,23 @@ export function NeonAuthHomologacao() {
               setResumo(JSON.stringify(retorno.dados, null, 2));
             })}
           >Testar escrita RLS — restrições (HML)</button>
+          <button
+            type="button"
+            className="rounded-md border border-slate-400 bg-slate-50 px-4 py-3 text-slate-800 disabled:opacity-50"
+            disabled={ocupado}
+            onClick={() => void executar(async () => {
+              const retorno = await verificarProtecaoHistoricoNeon();
+              if (retorno.erro) {
+                setResumo(null);
+                setMensagem(retorno.erro);
+                return;
+              }
+              setMensagem(retorno.dados?.resultado === 'aprovado'
+                ? 'Proteção de histórico aprovada: escala travada não pode ser editada.'
+                : 'Proteção do histórico não aprovada ou inconclusiva. Confira os detalhes.');
+              setResumo(JSON.stringify(retorno.dados, null, 2));
+            })}
+          >Testar proteção de escala travada (Admin HML)</button>
           <button
             type="button"
             className="rounded-md border border-slate-300 px-4 py-3 text-slate-800 disabled:opacity-50"
