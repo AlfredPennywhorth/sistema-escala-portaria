@@ -211,19 +211,24 @@ export function NeonAuthHomologacao() {
               const retorno = await logout();
               setResumo(null);
               setSenha('');
-              if (retorno.error) {
-                setMensagem('Não foi possível confirmar o encerramento: ' + retorno.error);
-                return;
-              }
+              // O provedor pode lançar erro depois de invalidar a sessão local.
+              // Sempre conferir o estado real antes de declarar falha ou sucesso.
               const verificacao = await verificarNeonPilot();
               if (verificacao.conectado || verificacao.usuario) {
-                setMensagem('ATENÇÃO: sessão ainda identificada após o logout. Não considerar o teste aprovado.');
+                setMensagem('ATENÇÃO: sessão ainda autenticada após o logout.'
+                  + (retorno.error ? ' Erro do provedor: ' + retorno.error : '')
+                  + ' Não considerar aprovado.');
                 return;
               }
               if (verificacao.erro === 'Sessão autenticada obrigatória') {
-                setMensagem('Logout confirmado: a verificação posterior não encontrou sessão autenticada. Teste agora o acesso às escalas.');
+                setMensagem(retorno.error
+                  ? 'Sessão ausente na verificação posterior, mas o provedor relatou erro no logout: '
+                    + retorno.error + '. Resultado parcial; confirme também o acesso às escalas.'
+                  : 'Logout confirmado: a verificação posterior não encontrou sessão autenticada. Teste agora o acesso às escalas.');
               } else {
-                setMensagem('Logout enviado, mas a verificação posterior não foi conclusiva: ' + (verificacao.erro || 'estado desconhecido'));
+                setMensagem('Logout inconclusivo: '
+                  + (retorno.error ? 'erro do provedor: ' + retorno.error + '; ' : '')
+                  + 'verificação posterior: ' + (verificacao.erro || 'estado desconhecido'));
               }
             })}
           >Encerrar sessão</button>
