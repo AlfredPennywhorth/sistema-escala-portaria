@@ -41,7 +41,7 @@ export async function obterMinhaAuxiliarNeon(): Promise<ServiceResult<Auxiliar |
     const cliente = criarClienteNeon();
     const { data: vinculo, error: erroVinculo } = await cliente
       .from('usuarios_auxiliares').select('auxiliar_id')
-      .eq('user_id', sessao.data.userId).maybeSingle();
+      .eq('user_id', sessao.data!.userId).maybeSingle();
     if (erroVinculo) return { data: null, error: erroVinculo.message };
     if (!vinculo?.auxiliar_id) return { data: null, error: null };
     const { data, error } = await cliente.from('auxiliares')
@@ -104,7 +104,7 @@ export async function listarMinhasDatasNeon(): Promise<ServiceResult<RodizioItem
         .in('id', ids)
         .in('status', ['publicado', 'travado']);
       if (erroEscalas) return { data: null, error: erroEscalas.message };
-      const permitidos = new Set((escalas ?? []).map((escala) => escala.id));
+      const permitidos = new Set(((escalas ?? []) as Array<{ id: string }>).map((escala) => escala.id));
       for (const item of pagina) {
         if (permitidos.has(item.rodizio_id)) {
           encontrados.push(item);
@@ -130,12 +130,12 @@ export async function verificarLeiturasFuncionaisNeon() {
   return {
     erro: null,
     dados: {
-      escalasVisiveis: escalas.data.length,
-      statusVisiveis: escalas.data.map((r) => r.status),
+      escalasVisiveis: escalas.data!.length,
+      statusVisiveis: escalas.data!.map((r) => r.status),
       auxiliarPessoalVinculada: Boolean(minha.data),
-      datasPropriasPublicadasOuTravadas: datas.data.length,
+      datasPropriasPublicadasOuTravadas: datas.data!.length,
       limiteDatasExibidas: 100,
-      dadosPodemEstarLimitados: datas.data.length === 100,
+      dadosPodemEstarLimitados: datas.data!.length === 100,
       leituraSomente: true,
     },
   };
