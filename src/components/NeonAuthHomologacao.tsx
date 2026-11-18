@@ -129,7 +129,7 @@ export function NeonAuthHomologacao() {
         </section>
         <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950">
           Teste controlado somente em homologação: tenta criar uma restrição fictícia.
-          Auxiliar deve receber bloqueio; Coordenadora deve conseguir criar e excluir.
+          Auxiliar deve receber bloqueio; Coordenadora e Administrador devem conseguir criar e excluir.
           O resultado indica se a limpeza foi confirmada.
         </p>
         <div className="mt-4 grid gap-2">
