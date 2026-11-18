@@ -63,23 +63,38 @@ export async function listarMinhasDatasNeon(): Promise<ServiceResult<RodizioItem
   try {
     const cliente = criarClienteNeon();
     // Buscar os itens da própria auxiliar PRIMEIRO, sem pré-limitar rodízios.
-    // Paginar por data+id estável para que uma escala antiga não desapareça
-    // quando existirem mais de 100 rodízios ou rascunhos recentes.
+    // Cursor composto data+id evita saltos se outras sessões removerem
+    // itens anteriores durante a paginação; não depende de OFFSET.
     const tamanhoPagina = 100;
     const limiteResultado = 100;
     const encontrados: RodizioItem[] = [];
-    let inicio = 0;
+    let cursor: { data: string; id: string } | null = null;
 
     while (encontrados.length < limiteResultado) {
-      const { data: itens, error: erroItens } = await cliente.from('rodizio_itens')
+      // Cursor composto (data, id): excluir os itens já percorridos sem
+      // deslocamentos por OFFSET. Avançar mesmo se toda página for rascunho.
+      let consulta = cliente.from('rodizio_itens')
         .select('id,rodizio_id,data,porta,periodo,auxiliar_id,observacoes,created_at')
-        .eq('auxiliar_id', minha.data.id)
+        .eq('auxiliar_id', minha.data.id);
+      if (cursor !== null) {
+        // Valores vêm de colunas date/uuid já lidas do banco, não de entrada livre.
+        consulta = consulta.or(`data.gt.${cursor.data},and(data.eq.${cursor.data},id.gt.${cursor.id})`);
+      }
+      const { data: itens, error: erroItens } = await consulta
         .order('data', { ascending: true })
         .order('id', { ascending: true })
-        .range(inicio, inicio + tamanhoPagina - 1);
+        .limit(tamanhoPagina);
       if (erroItens) return { data: null, error: erroItens.message };
       const pagina = (itens ?? []) as RodizioItem[];
       if (!pagina.length) break;
+
+      const ultimo = pagina[pagina.length - 1];
+      if (cursor !== null &&
+          (ultimo.data < cursor.data ||
+            (ultimo.data === cursor.data && ultimo.id <= cursor.id))) {
+        return { data: null, error: 'Falha de progressão do cursor da consulta Neon.' };
+      }
+      cursor = { data: ultimo.data, id: ultimo.id };
 
       // RLS também se aplica à leitura dos rodízios. Validar status para
       // cada página antes de limitar a lista final de datas.
@@ -97,7 +112,6 @@ export async function listarMinhasDatasNeon(): Promise<ServiceResult<RodizioItem
         }
       }
       if (pagina.length < tamanhoPagina) break;
-      inicio += tamanhoPagina;
     }
     return { data: encontrados, error: null };
   } catch {
