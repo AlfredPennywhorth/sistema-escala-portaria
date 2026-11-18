@@ -196,8 +196,10 @@ export function NeonAuthHomologacao() {
                 return;
               }
               setMensagem(retorno.dados?.resultado === 'aprovado'
-                ? 'Proteção de histórico aprovada: escala travada não pode ser editada.'
-                : 'Proteção do histórico não aprovada ou inconclusiva. Confira os detalhes.');
+                ? 'Gatilho de histórico confirmado: alteração recusada.'
+                : retorno.dados?.mecanismoBloqueio === 'rls'
+                  ? 'Escala travada protegida por RLS (0 linhas afetadas). O gatilho não foi exercitado; teste do gatilho inconclusivo.'
+                  : 'Proteção do histórico não aprovada ou inconclusiva. Confira os detalhes.');
               setResumo(JSON.stringify(retorno.dados, null, 2));
             })}
           >Testar proteção de escala travada (Admin HML)</button>
