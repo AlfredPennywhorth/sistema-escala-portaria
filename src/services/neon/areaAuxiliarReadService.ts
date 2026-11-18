@@ -62,22 +62,44 @@ export async function listarMinhasDatasNeon(): Promise<ServiceResult<RodizioItem
   if (!minha.data) return { data: [], error: null };
   try {
     const cliente = criarClienteNeon();
-    // Primeiro carregar os rodízios visíveis conforme RLS, depois restringir
-    // os itens aos IDs permitidos: não supor visibilidade de rascunhos.
-    const escalas = await listarEscalasVisiveisNeon();
-    if (escalas.error) return { data: null, error: escalas.error };
-    const ids = escalas.data
-      .filter((r) => r.status === 'publicado' || r.status === 'travado')
-      .map((r) => r.id);
-    if (!ids.length) return { data: [], error: null };
-    const { data, error } = await cliente.from('rodizio_itens')
-      .select('id,rodizio_id,data,porta,periodo,auxiliar_id,observacoes,created_at')
-      .eq('auxiliar_id', minha.data.id)
-      .in('rodizio_id', ids)
-      .order('data', { ascending: true })
-      .limit(100);
-    if (error) return { data: null, error: error.message };
-    return { data: (data ?? []) as RodizioItem[], error: null };
+    // Buscar os itens da própria auxiliar PRIMEIRO, sem pré-limitar rodízios.
+    // Paginar por data+id estável para que uma escala antiga não desapareça
+    // quando existirem mais de 100 rodízios ou rascunhos recentes.
+    const tamanhoPagina = 100;
+    const limiteResultado = 100;
+    const encontrados: RodizioItem[] = [];
+    let inicio = 0;
+
+    while (encontrados.length < limiteResultado) {
+      const { data: itens, error: erroItens } = await cliente.from('rodizio_itens')
+        .select('id,rodizio_id,data,porta,periodo,auxiliar_id,observacoes,created_at')
+        .eq('auxiliar_id', minha.data.id)
+        .order('data', { ascending: true })
+        .order('id', { ascending: true })
+        .range(inicio, inicio + tamanhoPagina - 1);
+      if (erroItens) return { data: null, error: erroItens.message };
+      const pagina = (itens ?? []) as RodizioItem[];
+      if (!pagina.length) break;
+
+      // RLS também se aplica à leitura dos rodízios. Validar status para
+      // cada página antes de limitar a lista final de datas.
+      const ids = [...new Set(pagina.map((item) => item.rodizio_id))];
+      const { data: escalas, error: erroEscalas } = await cliente.from('rodizios')
+        .select('id,status')
+        .in('id', ids)
+        .in('status', ['publicado', 'travado']);
+      if (erroEscalas) return { data: null, error: erroEscalas.message };
+      const permitidos = new Set((escalas ?? []).map((escala) => escala.id));
+      for (const item of pagina) {
+        if (permitidos.has(item.rodizio_id)) {
+          encontrados.push(item);
+          if (encontrados.length === limiteResultado) break;
+        }
+      }
+      if (pagina.length < tamanhoPagina) break;
+      inicio += tamanhoPagina;
+    }
+    return { data: encontrados, error: null };
   } catch {
     return { data: null, error: 'Falha ao consultar datas da auxiliar Neon.' };
   }
@@ -98,6 +120,8 @@ export async function verificarLeiturasFuncionaisNeon() {
       statusVisiveis: escalas.data.map((r) => r.status),
       auxiliarPessoalVinculada: Boolean(minha.data),
       datasPropriasPublicadasOuTravadas: datas.data.length,
+      limiteDatasExibidas: 100,
+      dadosPodemEstarLimitados: datas.data.length === 100,
       leituraSomente: true,
     },
   };
