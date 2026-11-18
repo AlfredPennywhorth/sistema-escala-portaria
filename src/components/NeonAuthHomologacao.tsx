@@ -3,6 +3,7 @@ import { confirmarCodigoEmail, loginComEmailSenha, logout, solicitarCodigoEmail 
 import { verificarNeonPilot, verificarLeituraEscalasNeon, verificarPermissoesAuxiliarNeon } from '../services/neonPilotService';
 import { verificarEscritaRestricoesNeon } from '../services/neonWriteAuditService';
 import { verificarProtecaoHistoricoNeon } from '../services/neonHistoricoAuditService';
+import { verificarLeiturasFuncionaisNeon } from '../services/neon/areaAuxiliarReadService';
 
 /**
  * Tela apenas para ambiente isolado com VITE_NEON_HOMOLOGACAO_ENABLED=true.
@@ -152,6 +153,21 @@ export function NeonAuthHomologacao() {
                 : `Consulta retornou ${retorno.dados?.length ?? 0} escala(s) visível(is) para esta sessão.`));
             })}
           >Testar acesso às escalas</button>
+          <button
+            type="button"
+            className="rounded-md border border-slate-300 px-4 py-3 text-slate-800 disabled:opacity-50"
+            disabled={ocupado}
+            onClick={() => void executar(async () => {
+              const retorno = await verificarLeiturasFuncionaisNeon();
+              if (retorno.erro) {
+                setResumo(null);
+                setMensagem(retorno.erro);
+                return;
+              }
+              setMensagem('Leituras funcionais Neon concluídas com JWT e RLS. Confira o resumo: nenhuma escrita foi executada.');
+              setResumo(JSON.stringify(retorno.dados, null, 2));
+            })}
+          >Testar consultas funcionais Neon (somente leitura)</button>
           <button
             type="button"
             className="rounded-md border border-slate-300 px-4 py-3 text-slate-800 disabled:opacity-50"
