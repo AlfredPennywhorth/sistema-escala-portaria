@@ -9,13 +9,16 @@ type Resultado = {
   teste: string;
   resultado: 'aprovado' | 'reprovado' | 'inconclusivo';
   codigoErro: string | null;
+  linhasAfetadas: number | null;
+  mecanismoBloqueio: 'rls' | 'gatilho' | 'nao_confirmado';
   detalhe: string;
   estadoAntes: string;
   estadoDepois: string;
 };
 
 /**
- * Testa o bloqueio do gatilho em escala TRAVADA com a sessão real de Admin.
+ * Testa a proteção de escala TRAVADA com a sessão real de Admin.
+ * A RLS pode filtrar o UPDATE antes que o gatilho por linha seja acionado.
  * O UPDATE é propositalmente idempotente (titulo recebe o valor já existente).
  * Não cria, altera ou apaga escalas, itens ou registros de produção.
  * Só executa se a fixture de HML corresponder a ID, título, status e travado.
@@ -59,23 +62,40 @@ export async function verificarProtecaoHistoricoNeon(): Promise<{
     teste: 'UPDATE idempotente de escala travada',
     resultado: 'inconclusivo',
     codigoErro: null,
+    linhasAfetadas: null,
+    mecanismoBloqueio: 'nao_confirmado',
     detalhe: '',
     estadoAntes: 'travado; titulo fictício validado',
     estadoDepois: 'pendente',
   };
   try {
+    // O Admin tem SELECT na fixture. RETURNING permite distinguir 0 linhas
+    // filtradas pela policy UPDATE de 1 linha efetivamente atingida.
     const tentativa = await cliente.from('rodizios')
-      .update({ titulo: TITULO_FIXTURE }).eq('id', ID_ESCALA_TRAVADA);
+      .update({ titulo: TITULO_FIXTURE })
+      .eq('id', ID_ESCALA_TRAVADA)
+      .select('id');
     retorno.codigoErro = tentativa.error?.code ?? null;
     if (!tentativa.error) {
-      retorno.resultado = 'reprovado';
-      retorno.detalhe = 'ALERTA: UPDATE da escala travada não foi bloqueado pelo banco.';
+      retorno.linhasAfetadas = tentativa.data?.length ?? null;
+      if (retorno.linhasAfetadas === 0) {
+        retorno.resultado = 'inconclusivo';
+        retorno.mecanismoBloqueio = 'rls';
+        retorno.detalhe = 'A policy RLS impediu que o UPDATE atingisse a escala travada (0 linhas). Histórico preservado; gatilho não foi exercitado e permanece sem homologação por JWT.';
+      } else if (retorno.linhasAfetadas === 1 && tentativa.data?.[0]?.id === ID_ESCALA_TRAVADA) {
+        retorno.resultado = 'reprovado';
+        retorno.detalhe = 'ALERTA: a escala travada foi atingida por UPDATE; proteção de escrita não confirmada.';
+      } else {
+        retorno.resultado = 'inconclusivo';
+        retorno.detalhe = 'Retorno de linhas afetadas inesperado; revisar a resposta do banco.';
+      }
     } else if (/travado|bloquead|hist[oó]ric|modifica[cç][aã]o/i.test(tentativa.error.message) &&
                ['P0001', '23514'].includes(tentativa.error.code ?? '')) {
       retorno.resultado = 'aprovado';
+      retorno.mecanismoBloqueio = 'gatilho';
       retorno.detalhe = 'Gatilho de integridade recusou a alteração: ' + tentativa.error.message;
     } else {
-      retorno.detalhe = 'Erro não comprova o gatilho de bloqueio: ' + tentativa.error.message;
+      retorno.detalhe = 'Erro não comprova o bloqueio esperado: ' + tentativa.error.message;
     }
   } catch (erro) {
     retorno.detalhe = 'Erro de transporte; resultado inconclusivo: ' + String(erro);
