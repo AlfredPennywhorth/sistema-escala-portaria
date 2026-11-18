@@ -37,7 +37,7 @@ export async function verificarEscritaRestricoesNeon(): Promise<{
   const usuario = sessao.data.session?.user;
   if (!usuario) return { erro: 'Sessão autenticada obrigatória.', dados: null };
 
-  const emailsPermitidos = ['andre.w.souza@outlook.com', 'aws311274@gmail.com'];
+  const emailsPermitidos = ['andre.w.souza@outlook.com', 'aws311274@gmail.com', 'andre.w.souza@outlook.com.br'];
   if (!emailsPermitidos.includes((usuario.email ?? '').toLowerCase())) {
     return { erro: 'Conta não autorizada para executar testes de escrita em HML.', dados: null };
   }
@@ -47,11 +47,25 @@ export async function verificarEscritaRestricoesNeon(): Promise<{
     .eq('user_id', usuario.id)
     .maybeSingle();
   if (perfil.error) return { erro: perfil.error.message, dados: null };
-  if (!perfil.data?.auxiliar_id) {
-    return { erro: 'Conta sem auxiliar de teste vinculada.', dados: null };
-  }
-  if (!['auxiliar', 'coordenadora', 'admin'].includes(perfil.data.perfil)) {
+  if (!perfil.data || !['auxiliar', 'coordenadora', 'admin'].includes(perfil.data.perfil)) {
     return { erro: 'Perfil não reconhecido para esta auditoria.', dados: null };
+  }
+
+  let auxiliarId = perfil.data.auxiliar_id;
+  if (perfil.data.perfil === 'admin') {
+    // Conta administrativa não possui auxiliar pessoal. Usar SOMENTE fixture
+    // previamente identificada nesta branch de HML, jamais uma auxiliar real.
+    const fixture = await cliente.from('auxiliares')
+      .select('id,nome')
+      .eq('id', '00000000-0000-4000-8000-000000000201')
+      .maybeSingle();
+    if (fixture.error || fixture.data?.nome !== 'TESTE FICTICIO - NAO USAR') {
+      return { erro: 'Fixture fictícia de homologação indisponível ou divergente; teste cancelado.', dados: null };
+    }
+    auxiliarId = fixture.data.id;
+  }
+  if (!auxiliarId) {
+    return { erro: 'Conta sem auxiliar de teste vinculada.', dados: null };
   }
 
   const esperadoPermitir = perfil.data.perfil !== 'auxiliar';
@@ -70,7 +84,7 @@ export async function verificarEscritaRestricoesNeon(): Promise<{
     const insercao = await cliente.from('restricoes_auxiliares')
       .insert({
         id,
-        auxiliar_id: perfil.data.auxiliar_id,
+        auxiliar_id: auxiliarId,
         tipo: 'observacao',
         motivo: 'TESTE HML RLS ' + id,
         ativa: true,
