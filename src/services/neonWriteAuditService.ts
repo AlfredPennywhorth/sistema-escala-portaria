@@ -20,7 +20,8 @@ function erroDeAutorizacao(erro: { code?: string; message?: string; status?: num
 
 /**
  * Auditoria HML com JWT real, sem modificar escalas existentes.
- * Uma tentativa de INSERT pode ter sido aplicada mesmo com resposta incerta.
+ * O INSERT não pede RETURNING, para que a policy SELECT não contamine
+ * a prova da policy INSERT. Mesmo com resposta incerta, a escrita pode ter ocorrido.
  * Portanto a rotina procura e remove exclusivamente seu próprio UUID.
  */
 export async function verificarEscritaRestricoesNeon(): Promise<{
@@ -65,8 +66,6 @@ export async function verificarEscritaRestricoesNeon(): Promise<{
     registroTesteId: id,
   };
 
-  let erroInsert: { code?: string; message?: string } | null = null;
-  let idConfirmado = false;
   try {
     const insercao = await cliente.from('restricoes_auxiliares')
       .insert({
@@ -75,13 +74,9 @@ export async function verificarEscritaRestricoesNeon(): Promise<{
         tipo: 'observacao',
         motivo: 'TESTE HML RLS ' + id,
         ativa: true,
-      })
-      .select('id')
-      .maybeSingle();
+      });
 
-    erroInsert = insercao.error;
     retorno.codigoErro = insercao.error?.code ?? null;
-    idConfirmado = insercao.data?.id === id;
 
     if (insercao.error) {
       const negadoPeloBanco = erroDeAutorizacao(insercao.error);
@@ -89,9 +84,6 @@ export async function verificarEscritaRestricoesNeon(): Promise<{
       retorno.detalhe = negadoPeloBanco
         ? 'Negativa de autorização SQLSTATE 42501: ' + insercao.error.message
         : 'Falha não comprova RLS (rede, sessão, schema ou integridade): ' + insercao.error.message;
-    } else if (!idConfirmado) {
-      retorno.resultado = 'inconclusivo';
-      retorno.detalhe = 'INSERT sem UUID confirmado; resultado não prova permissão ou bloqueio.';
     } else {
       retorno.resultado = esperadoPermitir ? 'aprovado' : 'reprovado';
       retorno.detalhe = esperadoPermitir
@@ -110,7 +102,7 @@ export async function verificarEscritaRestricoesNeon(): Promise<{
       .delete().eq('id', id).select('id');
     if (remocao.error) {
       retorno.limpeza = 'não confirmada (DELETE): ' + remocao.error.message + '; UUID ' + id;
-    } else if (remocao.data?.some((linha) => linha.id === id)) {
+    } else if (remocao.data?.some((linha: { id: string }) => linha.id === id)) {
       retorno.limpeza = 'confirmada: registro fictício removido';
     } else {
       // A ausência de linha removida não comprova ausência física, pois SELECT
@@ -125,9 +117,6 @@ export async function verificarEscritaRestricoesNeon(): Promise<{
       retorno.limpeza !== 'confirmada: registro fictício removido') {
     retorno.resultado = 'inconclusivo';
     retorno.detalhe += ' Limpeza precisa ser confirmada antes da aprovação.';
-  }
-  if (!esperadoPermitir && !erroInsert && idConfirmado) {
-    retorno.resultado = 'reprovado';
   }
   return { erro: null, dados: retorno };
 }
