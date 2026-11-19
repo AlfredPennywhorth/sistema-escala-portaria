@@ -81,7 +81,23 @@ export async function substituirItensRascunhoNeonHml(
         observacoes: item.observacoes ?? null,
       })),
     });
-    if (error) return { data: null, error: error.message };
+    if (error) {
+      // SQLSTATE retornado pelo PostgreSQL representa negativa do banco
+      // com rollback. Transporte/gateway sem SQLSTATE nao comprova commit.
+      const codigo = error.code ?? '';
+      if (/^[0-9A-Z]{5}$/.test(codigo)) {
+        return {
+          data: null,
+          error: 'RPC rejeitada pelo banco (' + codigo + '): ' + error.message,
+        };
+      }
+      return {
+        data: null,
+        error: 'Resultado indeterminado da RPC (' + (codigo || 'sem SQLSTATE') +
+          '): ' + error.message +
+          '. Verifique os itens no banco antes de repetir a gravacao.',
+      };
+    }
     if (typeof data !== 'number' || data !== itens.length) {
       return { data: null, error: 'Resposta da RPC divergente; nao repetir a operacao sem verificacao do banco.' };
     }
