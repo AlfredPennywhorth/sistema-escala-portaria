@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { confirmarCodigoEmail, loginComEmailSenha, logout, solicitarCodigoEmail } from '../services/neon/authService';
 import { verificarNeonPilot, verificarLeituraEscalasNeon, verificarPermissoesAuxiliarNeon } from '../services/neonPilotService';
 import { verificarEscritaRestricoesNeon } from '../services/neonWriteAuditService';
+import { verificarEscritaItensRascunhoNeon } from '../services/neonItensWriteAuditService';
 import { verificarProtecaoHistoricoNeon } from '../services/neonHistoricoAuditService';
 import { verificarLeiturasFuncionaisNeon } from '../services/neon/areaAuxiliarReadService';
 import { verificarCatalogosNeon } from '../services/neon/catalogosReadService';
@@ -216,6 +217,23 @@ export function NeonAuthHomologacao() {
               setResumo(JSON.stringify(retorno.dados, null, 2));
             })}
           >Testar escrita RLS — restrições (HML)</button>
+          <button
+            type="button"
+            className="rounded-md border border-amber-600 bg-amber-50 px-4 py-3 text-amber-950 disabled:opacity-50"
+            disabled={ocupado}
+            onClick={() => void executar(async () => {
+              const retorno = await verificarEscritaItensRascunhoNeon();
+              if (retorno.erro) {
+                setResumo(null);
+                setMensagem(retorno.erro);
+                return;
+              }
+              setMensagem(retorno.dados?.resultado === 'aprovado'
+                ? 'Escrita de item em rascunho e limpeza verificadas no Neon HML.'
+                : 'Teste de escrita de item inconclusivo/reprovado. Verifique UUID e limpeza no resumo.');
+              setResumo(JSON.stringify(retorno.dados, null, 2));
+            })}
+          >Testar gravação e limpeza de item fictício (Admin HML)</button>
           <button
             type="button"
             className="rounded-md border border-slate-400 bg-slate-50 px-4 py-3 text-slate-800 disabled:opacity-50"
