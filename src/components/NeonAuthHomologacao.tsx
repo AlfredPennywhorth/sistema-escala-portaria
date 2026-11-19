@@ -4,6 +4,7 @@ import { verificarNeonPilot, verificarLeituraEscalasNeon, verificarPermissoesAux
 import { verificarEscritaRestricoesNeon } from '../services/neonWriteAuditService';
 import { verificarProtecaoHistoricoNeon } from '../services/neonHistoricoAuditService';
 import { verificarLeiturasFuncionaisNeon } from '../services/neon/areaAuxiliarReadService';
+import { verificarCatalogosNeon } from '../services/neon/catalogosReadService';
 
 /**
  * Tela apenas para ambiente isolado com VITE_NEON_HOMOLOGACAO_ENABLED=true.
@@ -168,6 +169,21 @@ export function NeonAuthHomologacao() {
               setResumo(JSON.stringify(retorno.dados, null, 2));
             })}
           >Testar consultas funcionais Neon (somente leitura)</button>
+          <button
+            type="button"
+            className="rounded-md border border-slate-300 px-4 py-3 text-slate-800 disabled:opacity-50"
+            disabled={ocupado}
+            onClick={() => void executar(async () => {
+              const retorno = await verificarCatalogosNeon();
+              if (retorno.erro) {
+                setResumo(null);
+                setMensagem(retorno.erro);
+                return;
+              }
+              setMensagem('Catálogos Neon consultados via JWT e RLS, sem escrita. Ausência de restrições não comprova sozinha bloqueio por policy.');
+              setResumo(JSON.stringify(retorno.dados, null, 2));
+            })}
+          >Testar cadastros, restrições e itens Neon (leitura)</button>
           <button
             type="button"
             className="rounded-md border border-slate-300 px-4 py-3 text-slate-800 disabled:opacity-50"
