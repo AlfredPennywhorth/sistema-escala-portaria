@@ -5,6 +5,8 @@
 -- item desfaz o DELETE e TODOS os INSERTs (sem exclusao parcial).
 --
 -- A funcao e SECURITY INVOKER; nunca elevar privilegios de usuario.
+-- A identidade vem de public.usuario_atual_id(), wrapper DEFINER ja existente:
+-- authenticated nao possui USAGE no schema auth no ambiente Neon.
 -- Polices RLS nas duas tabelas e triggers permanecem ativos.
 
 create or replace function public.substituir_itens_rodizio_rascunho(
@@ -22,7 +24,7 @@ declare
   v_fim date;
   v_total integer;
 begin
-  if (select auth.uid()) is null or
+  if (select public.usuario_atual_id()) is null or
      not (select public.usuario_tem_perfil('admin')) then
     raise exception 'Somente administrador autenticado pode gravar itens'
       using errcode = '42501';
