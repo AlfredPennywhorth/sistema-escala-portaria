@@ -1,9 +1,10 @@
 # Gate da RPC de substituição atômica de rascunhos — 19/11/2026
 
 ## Situação
-**Proposta não aplicada ao Neon. Serviço ainda não conectado ao runtime nem à tela HML.**
+**Proposta aplicada exclusivamente na branch descartável Neon `br-holy-term-b6v6ofea`; NÃO aplicada na HML principal, nem produção.** A fachada funcional HML continua desconectada do fluxo operacional. Testes com JWT real concluídos em 19/11/2026.
 - SQL: `migration/neon/03_atomic_draft_items_PROPOSAL.sql`
 - Adaptador HML: `src/services/neon/rodizioDraftWriteService.ts`
+- Fachada funcional de leitura/gravação HML ainda isolada: `src/services/neon/rodizioFunctionalHmlService.ts`
 - Commit da correção P1: `8c5ad7490051d41d2817c2cb4b123555bed5cc2d`
 - Motivo da RPC: `src/services/rodiziosService.ts` legado exclui todos os itens e os reinsere em duas chamadas independentes, arriscando perda parcial.
 
@@ -30,6 +31,20 @@
 | I | Admin JWT | Duas substituições concorrentes | Sem mescla ou perda parcial; resultado serializado |
 | J | Admin JWT | Falha de transporte após envio | Não repetir cegamente; reconciliação com SELECT |
 
+## Evidências executadas em 19/11/2026
+
+- Branch descartável `br-holy-term-b6v6ofea`: RPC instalada com `SECURITY INVOKER`, `GRANT EXECUTE` para `authenticated` e EXECUTE negado a `anonymous`.
+- JWT real Coordenadora: chamada negada com SQLSTATE `42501`, sem alteração da fixture.
+- JWT real Auxiliar: chamada negada com SQLSTATE `42501`, sem alteração da fixture.
+- JWT real Administrador: chamada da RPC aprovada na fixture `...205`; item posterior com porta `TESTE RPC JWT ADMIN`, confirmado por SELECT independente. Teste não deve ser repetido.
+- Teste SQL isolado: gravou 2 itens e, após violação de FK `23503`, comprovou que os 2 anteriores permaneceram preservados. **Esse teste específico utilizou identidade simulada em transação**, não JWT real.
+- Negativas de conteúdo inválido: array vazio, data fora do período, porta em branco, chave JSON inesperada.
+- Negativas em escala publicada e travada, com SQLSTATE `42501` ou `P0002` por RLS/visibilidade.
+- Fixtures anteriores à prova JWT mantidas; alterações só na branch descartável.
+- Evidências na PR #2: comentários 7021943279 e 7023586246.
+
+**Não executados:** duas transações concorrentes reais, simulação de perda de resposta de rede após commit, volume acima dos limites, validação da navegação funcional Neon e recuperação segura. O SQL permanece apenas proposta para implantação futura, apesar da execução autorizada na branch temporária.
+
 ## Critérios de aceitação
 - Todo erro após o DELETE interno faz rollback da transação completa, sem escala parcialmente vazia.
 - Em nenhuma hipótese itens de escala travada são alterados.
@@ -39,4 +54,4 @@
 - Depois dos testes, descartar apenas a branch de banco temporária mediante autorização separada.
 
 ## Gates de produção
-Ainda pendentes: regras sobre editar escala publicada, histórico realizado imutável, importação reconciliada de usuários e dados reais, backup restaurável, testes com volume e rollback, homologação da navegação normal. A PR #2 permanece draft e não autoriza cutover.
+Ainda pendentes: concorrência verdadeira (inclusive lost update), teste de rede após commit, regras sobre editar escala publicada, histórico realizado imutável, importação reconciliada de usuários e dados reais, backup restaurável, testes com volume e restauração, homologação da navegação normal. A PR #2 permanece draft e não autoriza cutover.
