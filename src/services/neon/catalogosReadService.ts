@@ -67,24 +67,23 @@ export async function verificarCatalogosNeon(): Promise<{ dados: ResumoCatalogo 
       .eq('id', RODIZIO_RASCUNHO).maybeSingle();
     if (rascunho.error) return { dados: null, erro: rascunho.error.message };
 
-    // Consultas de itens só após verificar a visibilidade da escala pai.
-    // Não inferir acesso com base em sucesso HTTP e lista vazia.
-    let itensPublicados: Array<{ id: string }> = [];
-    if (publicado.data?.status === 'publicado') {
-      const resultado = await cliente.from('rodizio_itens').select('id')
-        .eq('rodizio_id', RODIZIO_PUBLICADO)
-        .order('id', { ascending: true }).limit(LIMITE_POR_CONSULTA);
-      if (resultado.error) return { dados: null, erro: resultado.error.message };
-      itensPublicados = (resultado.data ?? []) as Array<{ id: string }>;
+    // As policies SELECT de rodizios e rodizio_itens são independentes.
+    // Consultar ambas as fixtures diretamente, ainda que o rodízio pai
+    // esteja invisível, para detectar uma eventual exposição indevida.
+    const itensPublicadosResultado = await cliente.from('rodizio_itens')
+      .select('id').eq('rodizio_id', RODIZIO_PUBLICADO)
+      .order('id', { ascending: true }).limit(LIMITE_POR_CONSULTA);
+    if (itensPublicadosResultado.error) {
+      return { dados: null, erro: itensPublicadosResultado.error.message };
     }
-    let itensRascunho: Array<{ id: string }> = [];
-    if (rascunho.data?.status === 'rascunho') {
-      const resultado = await cliente.from('rodizio_itens').select('id')
-        .eq('rodizio_id', RODIZIO_RASCUNHO)
-        .order('id', { ascending: true }).limit(LIMITE_POR_CONSULTA);
-      if (resultado.error) return { dados: null, erro: resultado.error.message };
-      itensRascunho = (resultado.data ?? []) as Array<{ id: string }>;
+    const itensRascunhoResultado = await cliente.from('rodizio_itens')
+      .select('id').eq('rodizio_id', RODIZIO_RASCUNHO)
+      .order('id', { ascending: true }).limit(LIMITE_POR_CONSULTA);
+    if (itensRascunhoResultado.error) {
+      return { dados: null, erro: itensRascunhoResultado.error.message };
     }
+    const itensPublicados = (itensPublicadosResultado.data ?? []) as Array<{ id: string }>;
+    const itensRascunho = (itensRascunhoResultado.data ?? []) as Array<{ id: string }>;
 
     const aux = (auxiliares.data ?? []) as Array<{ id: string; ativa: boolean }>;
     const restr = (restricoes.data ?? []) as Array<{ id: string; ativa: boolean }>;
