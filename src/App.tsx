@@ -9,6 +9,7 @@ import { ConfigCheck } from './components/ConfigCheck';
 import { LoginPage } from './components/LoginPage';
 import { useAuth } from './hooks/useAuth';
 import { NeonAuthHomologacao } from './components/NeonAuthHomologacao';
+import { NeonRpcBranchHomologacao } from './components/NeonRpcBranchHomologacao';
 
 function AppPrincipal() {
   const { loading } = useAuth();
@@ -58,6 +59,12 @@ function AppPrincipal() {
 // Sem esta variável, o runtime Supabase original continua em uso.
 export function App() {
   if (import.meta.env.VITE_NEON_HOMOLOGACAO_ENABLED === 'true') {
+    // A rota da RPC usa Auth/Data API da branch DESCARTAVEL, nunca a principal.
+    // Evita expor o piloto no dominio de producao mesmo com flag acidental.
+    if (window.location.hostname === 'rodizio-portaria-neon-hml.pages.dev' &&
+        new URLSearchParams(window.location.search).get('rpc-branch-test') === '1') {
+      return <NeonRpcBranchHomologacao />;
+    }
     return <NeonAuthHomologacao />;
   }
   return <AppPrincipal />;
