@@ -90,8 +90,10 @@ export function NeonRpcBranchHomologacao() {
       return;
     }
     if (!negativo && (antes?.data?.length !== 1 ||
-        !antes.data[0].observacoes?.startsWith('TESTE TEMPORARIO JWT RPC'))) {
-      setMensagem('Fixture de escrita inesperada; operação cancelada. Verifique a branch no Neon.');
+        antes.data[0].id !== '00000000-0000-4000-8000-000000000305' ||
+        antes.data[0].porta !== 'TESTE RPC BASELINE' ||
+        antes.data[0].observacoes !== 'TESTE TEMPORARIO JWT RPC ORIGINAL')) {
+      setMensagem('Fixture original ja substituida ou divergente; nao repetir. Conferir a branch no Neon.');
       return;
     }
 
