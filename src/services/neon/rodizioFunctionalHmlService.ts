@@ -74,6 +74,29 @@ export async function obterRodizioComItensNeonHml(
       return { data: null, error: 'Mais de 500 itens: evitar leitura truncada sem paginação.' };
     }
 
+    // Leituras REST separadas não compartilham um snapshot transacional.
+    // Ler a revisão novamente detecta gravação concluída entre cabeçalho
+    // e itens, impedindo devolver um objeto misturado ou confirmar escrita
+    // baseada em contagem coincidente. Não substituir o cabecalho antigo.
+    const confirmacao = await cliente.from('rodizios')
+      .select('id,revisao,status,travado')
+      .eq('id', rodizioId).maybeSingle();
+    if (confirmacao.error) return { data: null, error: confirmacao.error.message };
+    if (!confirmacao.data) {
+      return { data: null, error: 'Escala indisponível durante a leitura; consultar novamente.' };
+    }
+    const revisaoInicial = (cabecalho.data as Rodizio & { revisao?: number | string }).revisao;
+    if (revisaoInicial == null ||
+        confirmacao.data.revisao == null ||
+        String(revisaoInicial) !== String(confirmacao.data.revisao) ||
+        cabecalho.data.status !== confirmacao.data.status ||
+        cabecalho.data.travado !== confirmacao.data.travado) {
+      return {
+        data: null,
+        error: 'Escala alterada durante a leitura. Descartar os dados misturados e recarregar; nenhuma repetição automática.',
+      };
+    }
+
     return {
       data: {
         rodizio: cabecalho.data as Rodizio,
@@ -135,11 +158,20 @@ export async function salvarRascunhoAtomicoNeonHml(
     };
   }
   const revisaoPosterior = (posterior.data.rodizio as Rodizio & { revisao?: number | string }).revisao;
-  if (posterior.data.itens.length !== itens.length ||
-      String(revisaoPosterior) !== String(revisaoOriginal + 1)) {
+  // A comparação de quantidade, sozinha, aceita um N+2 com o mesmo número
+  // de linhas. Validar revisão e conteúdo esperado, sem confiar em IDs novos.
+  const chave = (item: RodizioItemInput) => JSON.stringify([
+    item.data.slice(0, 10), item.porta.trim(), item.periodo || null,
+    item.auxiliar_id || null, item.observacoes ?? null,
+  ]);
+  const esperados = itens.map(chave).sort();
+  const encontrados = posterior.data.itens.map(item => chave(item)).sort();
+  if (String(revisaoPosterior) !== String(revisaoOriginal + 1) ||
+      esperados.length !== encontrados.length ||
+      esperados.some((item, i) => item !== encontrados[i])) {
     return {
       data: null,
-      error: 'RPC retornou sucesso, porém contagem divergente. Conferir banco antes de repetir.',
+      error: 'Reconciliação divergente (revisão ou conteúdo): outro escritor pode ter alterado a escala. Não repetir; conferir banco.',
     };
   }
   return { data: posterior.data, error: null };
