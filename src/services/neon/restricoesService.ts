@@ -52,16 +52,15 @@ export async function listarRestricoesAtivas(): Promise<ServiceResult<RestricaoA
 export async function listarRestricoesPorAuxiliarEPeriodo(
   auxiliarId: string,
   dataInicio: string,
-  _dataFim: string
+  dataFim: string
 ): Promise<ServiceResult<RestricaoAuxiliar[]>> {
-  void _dataFim; // unused parameter
   try {
     const { data, error } = await criarClienteNeon()
       .from('restricoes_auxiliares')
       .select('*')
       .eq('auxiliar_id', auxiliarId)
       .eq('ativa', true)
-      .or(`data.gte.${dataInicio},and(data.is.null,dia_semana.not.is.null)`);
+      .or(`and(data.gte.${dataInicio},data.lte.${dataFim}),and(data.is.null,dia_semana.not.is.null)`);
 
     if (error) {
       return { data: null, error: error.message };
@@ -186,15 +185,14 @@ export async function reativarRestricao(id: string): Promise<ServiceResult<Restr
 
 export async function listarRestricoesPorPeriodo(
   dataInicio: string,
-  _dataFim: string
+  dataFim: string
 ): Promise<ServiceResult<RestricaoAuxiliar[]>> {
-  void _dataFim; // unused parameter
   try {
     const { data, error } = await criarClienteNeon()
       .from('restricoes_auxiliares')
       .select('*')
       .eq('ativa', true)
-      .or(`data.gte.${dataInicio},and(data.is.null,dia_semana.not.is.null)`);
+      .or(`and(data.gte.${dataInicio},data.lte.${dataFim}),and(data.is.null,dia_semana.not.is.null)`);
 
     if (error) {
       return { data: null, error: error.message };
