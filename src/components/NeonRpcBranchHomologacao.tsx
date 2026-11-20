@@ -7,6 +7,10 @@ const AUTH_URL = 'https://ep-nameless-dust-b6271958.neonauth.c-2.sa-east-1.aws.n
 const DATA_URL = 'https://ep-nameless-dust-b6271958.apirest.c-2.sa-east-1.aws.neon.tech/rodizio_portas/rest/v1';
 const ESCALA_FICTICIA = '00000000-0000-4000-8000-000000000205';
 const AUXILIAR_FICTICIA = '00000000-0000-4000-8000-000000000201';
+const ESCALA_TRANSICAO = '00000000-0000-4000-8000-000000000206';
+const ESCALA_VAZIA = '00000000-0000-4000-8000-000000000207';
+const TITULO_TRANSICAO = 'TESTE FICTICIO TRANSICAO OCC COM ITEM';
+const TITULO_VAZIA = 'TESTE FICTICIO TRANSICAO OCC SEM ITEM';
 const TITULO_FICTICIO = 'TESTE FICTICIO RPC JWT BRANCH TEMPORARIA';
 const EMAILS_TESTE = [
   'andre.w.souza@outlook.com.br',
@@ -147,6 +151,104 @@ export function NeonRpcBranchHomologacao() {
     setMensagem('Teste concluído. Envie apenas o resumo de resultado, sem códigos de autenticação.');
   }
 
+
+  async function executarTransicaoVersionada(
+    operacao: 'publicar' | 'travar' | 'vazio' | 'negativa',
+  ) {
+    const sessao = await perfilAtual();
+    if (!sessao) return;
+    const negativa = operacao === 'negativa';
+    if (negativa && sessao.perfil === 'admin') {
+      setMensagem('Entre como Auxiliar ou Coordenadora para a negativa por perfil.');
+      return;
+    }
+    if (!negativa && sessao.perfil !== 'admin') {
+      setMensagem('Somente Administrador pode executar os testes positivos e de validação.');
+      return;
+    }
+
+    const id = operacao === 'vazio' ? ESCALA_VAZIA : ESCALA_TRANSICAO;
+    const esperado = operacao === 'travar'
+      ? { titulo: TITULO_TRANSICAO, status: 'publicado', revisao: 1, travado: false }
+      : operacao === 'vazio'
+        ? { titulo: TITULO_VAZIA, status: 'rascunho', revisao: 0, travado: false }
+        : { titulo: TITULO_TRANSICAO, status: 'rascunho', revisao: 0, travado: false };
+    const antes = await CLIENTE.from('rodizios')
+      .select('id,titulo,status,travado,revisao,travado_em')
+      .eq('id', id).maybeSingle();
+    if (antes.error) {
+      setMensagem('Falha ao ler a fixture da transição. Não executar a RPC.');
+      return;
+    }
+    // Para usuários não-admin, RLS pode ocultar rascunhos. A negativa
+    // usa exclusivamente o ID fixo e revisão 0, nunca é prova positiva.
+    if (!negativa && (!antes.data ||
+        antes.data.titulo !== esperado.titulo ||
+        antes.data.status !== esperado.status ||
+        antes.data.travado !== esperado.travado ||
+        String(antes.data.revisao) !== String(esperado.revisao))) {
+      setMensagem('Fixture divergente ou já utilizada; operação cancelada. Não repetir.');
+      return;
+    }
+    if (!negativa) {
+      const itens = await CLIENTE.from('rodizio_itens')
+        .select('id').eq('rodizio_id', id).limit(2);
+      if (itens.error || itens.data?.length !== (operacao === 'vazio' ? 0 : 1)) {
+        setMensagem('Quantidade de itens divergente. Operação não enviada.');
+        return;
+      }
+    }
+
+    const fn = operacao === 'travar'
+      ? 'travar_rodizio_versionado' : 'publicar_rodizio_versionado';
+    const resposta = await CLIENTE.rpc(fn, {
+      p_rodizio_id: id,
+      p_revisao_esperada: operacao === 'travar' ? 1 : 0,
+    });
+    const codigo = resposta.error?.code ?? null;
+    const negado = codigo === '42501' || codigo === 'P0002';
+    const depois = sessao.perfil === 'admin'
+      ? await CLIENTE.from('rodizios')
+        .select('id,titulo,status,travado,revisao,travado_em')
+        .eq('id', id).maybeSingle()
+      : null;
+    let situacao: string;
+    if (negativa) {
+      situacao = negado ? 'aprovado: acesso negado pelo banco'
+        : resposta.error ? 'inconclusivo: verificar erro e fixture'
+          : 'REPROVADO: perfil não-admin executou RPC';
+    } else if (operacao === 'vazio') {
+      situacao = codigo === '22023' &&
+        String(depois?.data?.revisao) === '0' &&
+        depois?.data?.status === 'rascunho'
+        ? 'aprovado: não publicou escala vazia'
+        : 'inconclusivo/reprovado: conferir banco';
+    } else if (resposta.error || depois?.error) {
+      situacao = !codigo || !/^[0-9A-Z]{5}$/.test(codigo)
+        ? 'indeterminado: confira banco antes de repetir'
+        : 'recusado pelo banco: ' + codigo;
+    } else {
+      const novaRevisao = operacao === 'travar' ? 2 : 1;
+      const novoEstado = operacao === 'travar' ? 'travado' : 'publicado';
+      situacao = String(resposta.data) === String(novaRevisao) &&
+        String(depois?.data?.revisao) === String(novaRevisao) &&
+        depois?.data?.status === novoEstado &&
+        depois?.data?.travado === (operacao === 'travar') &&
+        (operacao !== 'travar' || !!depois?.data?.travado_em)
+        ? 'aprovado: transição versionada com JWT Admin real'
+        : 'inconclusivo: revisão/estado divergente; não repetir';
+    }
+    setResultado(JSON.stringify({
+      ambiente: 'Neon descartável br-holy-term-b6v6ofea',
+      perfil: sessao.perfil, operacao, id, resultado: situacao,
+      codigoErro: codigo, revisaoAntes: antes.data?.revisao ?? null,
+      revisaoDepois: depois?.data?.revisao ?? null,
+      estadoDepois: depois?.data?.status ?? null,
+      retorno: resposta.error ? null : resposta.data,
+    }, null, 2));
+    setMensagem('Guarde somente o resultado. Não envie OTP ou JWT; não repita testes positivos.');
+  }
+
   return (
     <main className="min-h-screen bg-slate-50 p-4">
       <section className="mx-auto max-w-md space-y-4 rounded-xl bg-white p-5 shadow-sm">
@@ -195,6 +297,30 @@ export function NeonRpcBranchHomologacao() {
           onClick={() => void executar(() => executarProva(false))}>
           Testar gravação na fixture descartável (Admin)
         </button>
+        <div className="border-t pt-4 space-y-2">
+          <h2 className="text-lg font-semibold">SQL 05 — transições com JWT real</h2>
+          <p className="text-xs text-amber-900">
+            Apenas fixtures 206 e 207, nunca produção. Execute as negativas
+            com Auxiliar/Coordenadora antes dos positivos. Admin: publicar
+            somente uma vez e depois travar somente uma vez.
+          </p>
+          <button type="button" disabled={ocupado} className="w-full rounded-md border p-3 disabled:opacity-50"
+            onClick={() => void executar(() => executarTransicaoVersionada('negativa'))}>
+            T10/T11 — Negativa por perfil (Auxiliar/Coordenadora)
+          </button>
+          <button type="button" disabled={ocupado} className="w-full rounded-md border p-3 disabled:opacity-50"
+            onClick={() => void executar(() => executarTransicaoVersionada('vazio'))}>
+            T06 — Bloquear publicação de escala vazia (Admin)
+          </button>
+          <button type="button" disabled={ocupado} className="w-full rounded-md border border-red-500 p-3 disabled:opacity-50"
+            onClick={() => void executar(() => executarTransicaoVersionada('publicar'))}>
+            T01 — Publicar fixture 206 uma única vez (Admin)
+          </button>
+          <button type="button" disabled={ocupado} className="w-full rounded-md border border-red-500 p-3 disabled:opacity-50"
+            onClick={() => void executar(() => executarTransicaoVersionada('travar'))}>
+            T04 — Travar fixture 206 uma única vez (Admin)
+          </button>
+        </div>
         <button type="button" disabled={ocupado} className="w-full rounded-md border p-3 disabled:opacity-50"
           onClick={() => void executar(async () => {
             const retorno = await CLIENTE.auth.signOut();
