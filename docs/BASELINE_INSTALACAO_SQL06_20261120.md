@@ -30,3 +30,21 @@ Snapshot completo dos sete cabeçalhos e dos sete itens foi consultado diretamen
 Executar em transação única os **quatro CREATE OR REPLACE FUNCTION** e os **quatro REVOKE e quatro GRANT** correspondentes, copiados do arquivo SQL06 verificado, sem alterações na definição e sem outras instruções. Conferir assinaturas, flags SECURITY INVOKER e privilégios após COMMIT. Reconciliar contagens, revisões, estado e itens com este snapshot. Sem testes de mutação de fixtures até novo gate de homologação.
 
 **Estado deste documento:** registro pré-instalação; os resultados pós-instalação devem ser acrescentados em seção separada.
+
+## Resultado pós-instalação na branch descartável — 20/11/2026
+
+**Instalação efetivamente executada após autorização explícita do usuário**, exclusivamente `blue-sky-02214231/br-holy-term-b6v6ofea/rodizio_portas`. Código-fonte utilizado: blob SQL06 `42d752306a43681f8f875474b7fac46c0858aadd`, sem modificações. Uma transação SQL com 12 instruções: 4 `CREATE OR REPLACE FUNCTION`, 4 `REVOKE ALL ... FROM PUBLIC, anonymous`, 4 `GRANT EXECUTE ... TO authenticated`. Ferramenta confirmou conclusão da transação sem erro.
+
+**Verificação SQL independente após COMMIT:**
+| Função | Return | SECURITY DEFINER | authenticated EXECUTE | anonymous EXECUTE | PUBLIC EXECUTE |
+| --- | --- | --- | --- | --- | --- |
+| criar_rodizio_rascunho_versionado | uuid | false | true | false | false |
+| atualizar_cabecalho_rascunho_versionado | bigint | false | true | false | false |
+| cancelar_rodizio_versionado | bigint | false | true | false | false |
+| excluir_rodizio_rascunho_versionado | boolean | false | true | false | false |
+
+Contagens pós-instalação: **7 escalas, 7 itens, 2 auxiliares, 0 restrições, 2 gatilhos de proteção habilitados**. SELECT independente de todos os sete cabeçalhos e sete itens confirmou estados, títulos, revisões, observações, referências, datas, portas e timestamps compatíveis com snapshot pré-instalação. A fixture 206 permanece travada com revisão 2; 207 rascunho revisão 0, sem itens; 208 publicado revisão 0, com item 308.
+
+**Escopo respeitado:** nenhuma escala inserida/editada/excluída; nenhuma mudança na HML principal, branch principal Neon, Supabase de origem, código master ou produção; PR #2 continua draft. Não foi feita invocação mutante de RPCs.
+
+**Gates ainda abertos:** testes reais com JWT Admin/Coordenadora/Auxiliar/sem JWT; concorrência, efeitos de cascata em fixture inédita, timeout pós-COMMIT e teste de rollback; fechamento de DML direto e RPC antiga; integração funcional e migração de dados. `SECURITY INVOKER` continua dependente dos GRANTs de DML atuais, portanto não revogar privilégios isoladamente. Nenhuma autorização implícita para novas mutações de fixtures.
