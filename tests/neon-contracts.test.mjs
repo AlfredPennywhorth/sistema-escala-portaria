@@ -162,3 +162,10 @@ test('SQL06 mutation adapter is bound to the disposable Neon branch only', () =>
   const build = read('scripts/build-cloudflare-homologacao.mjs');
   assert.doesNotMatch(build, /VITE_NEON_SQL06_ENABLED:\s*'true'/);
 });
+
+test('SQL06 date validation rejects invalid ISO dates and year coercion', () => {
+  const source = read('src/services/neon/rodizioAdminSql06HmlService.ts');
+  assert.match(source, /ano < 1 \|\| ano > 9999/);
+  assert.match(source, /dt\.setUTCFullYear\(ano, mes - 1, dia\)/);
+  assert.doesNotMatch(source, /Date\.UTC\(ano, mes - 1, dia\)/);
+});
