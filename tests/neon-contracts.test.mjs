@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 
 const read = (path) => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
 const draft = read('migration/neon/04_optimistic_revision_drafts_PROPOSAL.sql');
@@ -79,5 +79,26 @@ test('Neon restriction period queries honor both bounds and weekday recurrences'
     assert.match(block, /dataFim: string/);
     assert.match(block, /and\(data\.gte\.\$\{dataInicio\},data\.lte\.\$\{dataFim\}\)/);
     assert.match(block, /and\(data\.is\.null,dia_semana\.not\.is\.null\)/);
+  }
+});
+
+test('No direct scale DML in Neon service modules', () => {
+  // Conservative fail-closed check: anything writing a scale table from a
+  // Neon service must use an approved RPC instead of ad-hoc REST mutations.
+  const dir = new URL('../src/services/neon/', import.meta.url);
+  for (const filename of readdirSync(dir).filter((name) => name.endsWith('.ts'))) {
+    const source = readFileSync(new URL(filename, dir), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/^\s*\/\/.*$/gm, '');
+    // A chain beginning at .from('rodizios') or .from('rodizio_itens')
+    // must not contain direct insert/update/delete/upsert before its
+    // terminal semicolon. This deliberately prefers false positives over
+    // silently approving dangerous new DML.
+    const chains = source.split(';').filter((segment) =>
+      /\.from\(['"]rodizios?['"]\)|\.from\(['"]rodizio_itens['"]\)/.test(segment));
+    for (const chain of chains) {
+      assert.doesNotMatch(chain, /\.(?:insert|update|delete|upsert)\s*\(/,
+        filename + ': prohibited direct scale mutation');
+    }
   }
 });
