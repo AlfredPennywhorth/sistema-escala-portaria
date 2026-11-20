@@ -51,3 +51,20 @@ test('HML-only guards remain enforced on mutation adapters', () => {
     assert.match(source, /vinculo\.data\?\.perfil !== 'admin'|perfil\.data\?\.perfil !== 'admin'/);
   }
 });
+
+test('Neon legacy scale service fails closed for every write route', () => {
+  const legacy = read('src/services/neon/rodiziosService.ts');
+  assert.match(legacy, /const ESCRITA_BLOQUEADA/);
+  const methods = ['criarRodizio', 'salvarItensRodizio', 'publicarRodizio',
+    'travarRodizio', 'cancelarRodizio', 'excluirRodizioRascunho'];
+  for (const method of methods) {
+    const start = legacy.indexOf('export async function ' + method + '(');
+    assert.ok(start >= 0, method + ' missing');
+    const next = legacy.indexOf('export async function ', start + 1);
+    const body = legacy.slice(start, next < 0 ? undefined : next);
+    assert.match(body, /return \{ data: null, error: ESCRITA_BLOQUEADA \}/,
+      method + ' must fail closed');
+    assert.doesNotMatch(body, /\.insert\(|\.update\(|\.delete\(|\.rpc\(/,
+      method + ' must not write directly');
+  }
+});
