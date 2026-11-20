@@ -67,7 +67,7 @@ export function App() {
     // Nunca habilitar em rodizio-portaria.pages.dev ou em domínio externo.
     const hostname = window.location.hostname.toLowerCase();
     const hostnameHml = hostname === 'rodizio-portaria-neon-hml.pages.dev' ||
-      /^[a-z0-9-]+\\.rodizio-portaria-neon-hml\\.pages\\.dev$/.test(hostname);
+      /^[a-z0-9-]+\.rodizio-portaria-neon-hml\.pages\.dev$/.test(hostname);
     if (hostnameHml &&
         new URLSearchParams(window.location.search).get('rpc-branch-test') === '1') {
       return <NeonRpcBranchHomologacao />;
