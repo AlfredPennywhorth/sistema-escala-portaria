@@ -34,8 +34,16 @@ async function executarSql06<T>(
   args: Record<string, unknown>,
   validar: (data: unknown) => T | null,
 ): Promise<ServiceResult<T>> {
-  if (import.meta.env.VITE_NEON_HOMOLOGACAO_ENABLED !== 'true') {
-    return { data: null, error: 'SQL 06 disponível exclusivamente em homologação Neon.' };
+  // Duplo gate: flag isolada + endpoints públicos EXATOS da branch
+  // descartável. A build padrão Cloudflare HML usa ep-purple-water e
+  // nunca deve executar mutações SQL06, mesmo após uma integração acidental.
+  const authEndpoint = 'https://ep-nameless-dust-b6271958.neonauth.c-2.sa-east-1.aws.neon.tech/rodizio_portas/auth';
+  const dataEndpoint = 'https://ep-nameless-dust-b6271958.apirest.c-2.sa-east-1.aws.neon.tech/rodizio_portas/rest/v1';
+  if (import.meta.env.VITE_NEON_HOMOLOGACAO_ENABLED !== 'true' ||
+      import.meta.env.VITE_NEON_SQL06_ENABLED !== 'true' ||
+      import.meta.env.VITE_NEON_AUTH_URL !== authEndpoint ||
+      import.meta.env.VITE_NEON_DATA_API_URL !== dataEndpoint) {
+    return { data: null, error: 'SQL 06 bloqueada: autorização de teste ou branch Neon descartável não confirmada.' };
   }
   try {
     const cliente = criarClienteNeon();
