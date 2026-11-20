@@ -24,3 +24,9 @@ Nenhuma operação de escrita contorna a revisão, nenhuma conta sem perfil Admi
 
 ## Escopo
 Esta nota e o código de adaptador são exclusivamente alterações na PR #2 em DRAFT. Nenhuma DDL/DML adicional foi aplicada no Neon após a SQL versionada já autorizada. Nenhum merge/deploy em produção.
+
+## Aceleração de 20/11 — contenção de risco no código Neon (não é fechamento do banco)
+- `src/services/neon/rodiziosService.ts`: desabilitadas explicitamente as seis operações legadas de escrita (criação, substituição de itens, publicação, travamento, cancelamento, exclusão de rascunho), retornando erro fechado; funções de leitura preservadas. Não afeta `src/services/rodiziosService.ts` nem a produção Supabase.
+- Novo teste `tests/neon-contracts.test.mjs` verifica guardas estáticos de autorização, revisão OCC, cautela contra repetição de RPC e bloqueio das seis escritas legadas. Workflow de PR atualizado para rodá-lo e considerar alterações em `migration/neon/**`.
+- **Importante:** controles estáticos não substituem SQL com JWT real, concorrência e migração. DML direto na Data API e RPC não versionada **continuam disponíveis no banco descartável**. Não marcar o gate sistêmico como fechado.
+- Próximo pacote de execução: novas RPCs de todas as mutações administrativas, revisão de `SECURITY DEFINER`, concessões mínimas e retirada **atômica** de DML direto e EXECUTE legado numa branch descartável, após autorização específica e testes de integração.
