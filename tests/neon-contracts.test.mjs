@@ -169,3 +169,18 @@ test('SQL06 date validation rejects invalid ISO dates and year coercion', () => 
   assert.match(source, /dt\.setUTCFullYear\(ano, mes - 1, dia\)/);
   assert.doesNotMatch(source, /Date\.UTC\(ano, mes - 1, dia\)/);
 });
+
+test('SQL06 malformed external payload must be rejected before RPC', () => {
+  const source = read('src/services/neon/rodizioAdminSql06HmlService.ts');
+  assert.match(source, /input !== null && typeof input === 'object'/);
+  assert.match(source, /typeof input\.titulo === 'string'/);
+  assert.match(source, /intervaloValido\(input\.dataInicio, input\.dataFim\)/);
+});
+
+test('SQL06 preflight must remain strictly read-only', () => {
+  const source = read('migration/neon/tests/07_sql06_preflight_readonly.sql')
+    .replace(/--.*$/gm, '');
+  assert.match(source, /to_regprocedure/);
+  assert.match(source, /SELECT current_database\(\)/i);
+  assert.doesNotMatch(source, /\b(?:INSERT|UPDATE|DELETE|ALTER|CREATE|DROP|REVOKE|GRANT|TRUNCATE)\b/i);
+});
