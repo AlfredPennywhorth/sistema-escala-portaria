@@ -43,3 +43,13 @@ Antes da liberação, revisar e converter apenas RPCs aprovadas para execução 
 
 ## Critério Go/No-Go
 Go apenas se todos os casos A–L forem provados, DML direto e RPC legada estiverem inacessíveis, CI e revisão independente aprovados, migração funcional completa e backup reconciliado. A produção não foi alterada por este documento.
+
+## Atualização — adaptadores isolados e CI (20/11/2026)
+
+Foi criado `src/services/neon/rodizioAdminSql06HmlService.ts` na PR #2. O código contém quatro chamadas RPC SQL 06 e, por padrão, não é consumido pela UI. Cada operação confirma a flag de homologação, sessão JWT, vínculo com perfil `admin` e valida argumentos, sem fallback de DML direto nem repetição automática. Criação retorna UUID, atualizações/cancelamento exigem revisão original e resultado `revisaoOriginal+1`, exclusão exige retorno `true`.
+
+A criação de rascunho **não é idempotente**; falha de transporte depois do COMMIT pode deixar o estado indeterminado. A integração à interface somente será aceita após adoção de uma estratégia de idempotência (por exemplo, identificador de comando único) ou reconciliação explícita obrigatória sem retentativa automática.
+
+`tests/neon-contracts.test.mjs` foi ampliado com as verificações estáticas dos adaptadores. Estas verificações **não equivalem** a testes PostgreSQL/JWT real e não provam a semântica de concorrência ou RLS. A SQL 06 permanece não aplicada em qualquer branch do Neon.
+
+Ainda pendente: revisão técnica das propostas; teste de JWT real na branch descartável; revisão de autorização `SECURITY DEFINER`/RLS antes de qualquer revogação coordenada; fechamento de todas as vias DML e RPC legada; integração funcional e dados reais.
