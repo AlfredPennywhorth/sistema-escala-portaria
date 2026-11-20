@@ -67,3 +67,13 @@ Essas flags no browser são guardas operacionais, não fronteiras de segurança:
 - Autorização específica antes de executar SQL06 na branch descartável.
 - Homologação JWT real / concurrência / baseline / rollback.
 - Origem e backup dos dados reais, migração funcional, CI E2E e Go/No-Go final.
+
+## Pré-instalação independente — 20/11/2026
+
+Preflight executado por SELECT em `br-holy-term-b6v6ofea`, banco `rodizio_portas`, conexão proprietária exclusivamente de leitura. Resultado: 7 cabeçalhos de escalas, 7 itens; `criar_rodizio_rascunho_versionado`, `atualizar_cabecalho_rascunho_versionado`, `cancelar_rodizio_versionado` e `excluir_rodizio_rascunho_versionado` **não instaladas**. Nenhum dado ou grant foi alterado.
+
+Script reproduzível `migration/neon/tests/07_sql06_preflight_readonly.sql`; contém apenas SELECT, verifica instalações por `to_regprocedure` e traz resumo das fixtures já existentes. Antes de instalar, ainda é indispensável baseline completo, revisão independente, autorização explícita e fixtures *novas* para não reutilizar 206/207/208.
+
+Corrigido no TypeScript: validação de cabeçalho rejeita `null` e payloads não objetos (entrada externa pode não respeitar o tipo TS). Testes estáticos adicionados para garantir guarda e preflight read-only.
+
+**Estado:** preparada, não instalada, não homologada por JWT real. A aprovação do CI indica qualidade estática/build, não autorização para rodar DDL.
