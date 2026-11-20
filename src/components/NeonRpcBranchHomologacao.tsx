@@ -9,6 +9,8 @@ const ESCALA_FICTICIA = '00000000-0000-4000-8000-000000000205';
 const AUXILIAR_FICTICIA = '00000000-0000-4000-8000-000000000201';
 const ESCALA_TRANSICAO = '00000000-0000-4000-8000-000000000206';
 const ESCALA_VAZIA = '00000000-0000-4000-8000-000000000207';
+const ESCALA_NEGATIVA_TRAVAMENTO = '00000000-0000-4000-8000-000000000208';
+const TITULO_NEGATIVA_TRAVAMENTO = 'TESTE FICTICIO NEGATIVA TRAVAMENTO JWT';
 const TITULO_TRANSICAO = 'TESTE FICTICIO TRANSICAO OCC COM ITEM';
 const TITULO_VAZIA = 'TESTE FICTICIO TRANSICAO OCC SEM ITEM';
 const TITULO_FICTICIO = 'TESTE FICTICIO RPC JWT BRANCH TEMPORARIA';
@@ -167,9 +169,13 @@ export function NeonRpcBranchHomologacao() {
       return;
     }
 
-    const id = operacao === 'vazio' ? ESCALA_VAZIA : ESCALA_TRANSICAO;
-    const esperado = operacao === 'travar'
-      ? { titulo: TITULO_TRANSICAO, status: 'publicado', revisao: 1, travado: false }
+    const id = operacao === 'vazio' ? ESCALA_VAZIA
+      : operacao === 'negativa-travar' ? ESCALA_NEGATIVA_TRAVAMENTO
+        : ESCALA_TRANSICAO;
+    const esperado = operacao === 'negativa-travar'
+      ? { titulo: TITULO_NEGATIVA_TRAVAMENTO, status: 'publicado', revisao: 0, travado: false }
+      : operacao === 'travar'
+        ? { titulo: TITULO_TRANSICAO, status: 'publicado', revisao: 1, travado: false }
       : operacao === 'vazio'
         ? { titulo: TITULO_VAZIA, status: 'rascunho', revisao: 0, travado: false }
         : { titulo: TITULO_TRANSICAO, status: 'rascunho', revisao: 0, travado: false };
@@ -180,9 +186,11 @@ export function NeonRpcBranchHomologacao() {
       setMensagem('Falha ao ler a fixture da transição. Não executar a RPC.');
       return;
     }
-    // Para usuários não-admin, RLS pode ocultar rascunhos. A negativa
-    // usa exclusivamente o ID fixo e revisão 0, nunca é prova positiva.
-    if (!negativa && (!antes.data ||
+    // O perfil não-admin pode não visualizar rascunho pela RLS. Já a
+    // fixture 208 publicada precisa ser visível para esta prova negativa:
+    // estado, revisão e título são validados ANTES de solicitar a RPC.
+    const validarFixture = !negativa || operacao === 'negativa-travar';
+    if (validarFixture && (!antes.data ||
         antes.data.titulo !== esperado.titulo ||
         antes.data.status !== esperado.status ||
         antes.data.travado !== esperado.travado ||
@@ -206,7 +214,13 @@ export function NeonRpcBranchHomologacao() {
       p_revisao_esperada: operacao === 'travar' ? 1 : 0,
     });
     const codigo = resposta.error?.code ?? null;
-    const negado = codigo === '42501' || codigo === 'P0002';
+    // Uma recusa por ESTADO também pode usar 42501. Só aceitar o teste
+    // negativo se a mensagem corresponder à autorização da própria RPC.
+    const mensagemErro = resposta.error?.message ?? '';
+    const negadoPorPerfil = codigo === '42501' &&
+      (operacao === 'negativa-travar'
+        ? mensagemErro.includes('Somente administrador autenticado pode travar')
+        : mensagemErro.includes('Somente administrador autenticado pode publicar'));
     const depois = sessao.perfil === 'admin'
       ? await CLIENTE.from('rodizios')
         .select('id,titulo,status,travado,revisao,travado_em')
@@ -214,8 +228,8 @@ export function NeonRpcBranchHomologacao() {
       : null;
     let situacao: string;
     if (negativa) {
-      situacao = negado ? 'aprovado: acesso negado pelo banco'
-        : resposta.error ? 'inconclusivo: verificar erro e fixture'
+      situacao = negadoPorPerfil ? 'aprovado: autorização negada pelo banco'
+        : resposta.error ? 'REPROVADO/inconclusivo: SQL não confirmou negativa por perfil'
           : 'REPROVADO: perfil não-admin executou RPC';
     } else if (operacao === 'vazio') {
       situacao = codigo === '22023' &&
@@ -241,7 +255,8 @@ export function NeonRpcBranchHomologacao() {
     setResultado(JSON.stringify({
       ambiente: 'Neon descartável br-holy-term-b6v6ofea',
       perfil: sessao.perfil, operacao, id, resultado: situacao,
-      codigoErro: codigo, revisaoAntes: antes.data?.revisao ?? null,
+      codigoErro: codigo, erroBanco: resposta.error?.message ?? null,
+      revisaoAntes: antes.data?.revisao ?? null,
       revisaoDepois: depois?.data?.revisao ?? null,
       estadoDepois: depois?.data?.status ?? null,
       retorno: resposta.error ? null : resposta.data,
@@ -300,7 +315,7 @@ export function NeonRpcBranchHomologacao() {
         <div className="border-t pt-4 space-y-2">
           <h2 className="text-lg font-semibold">SQL 05 — transições com JWT real</h2>
           <p className="text-xs text-amber-900">
-            Apenas fixtures 206 e 207, nunca produção. Execute as negativas
+            Apenas fixtures 206, 207 e 208, nunca produção. Execute as negativas
             com Auxiliar/Coordenadora, para publicar e travar, antes dos positivos. Admin: publicar
             somente uma vez e depois travar somente uma vez.
           </p>
