@@ -48,3 +48,19 @@ A RPC 03 sem versão, DML direto do papel `authenticated`, alteração/cancelame
 ## Situação e autorização
 
 Autorização anterior: aplicação **somente da SQL 04** em branch descartável. A SQL 05 não está abrangida por aquela autorização. A PR #2 continua draft; sem merge, sem deploy em produção, sem alterações na branch Neon principal.
+
+## Atualização — auditoria somente leitura, 20/11/2026
+
+**Esta seção prevalece sobre o cabeçalho histórico que dizia que a SQL 05 não estava aplicada.** Consulta direta na branch descartável `br-holy-term-b6v6ofea` (banco `rodizio_portas`) encontrou as RPCs `publicar_rodizio_versionado(uuid,bigint)` e `travar_rodizio_versionado(uuid,bigint)`, ambas `SECURITY INVOKER` e executáveis por `authenticated`. Gatilhos `trg_bloquear_rodizio_travado` e `trg_bloquear_itens_travados` habilitados. Não se inferiu dessa constatação que todas as políticas e o fechamento das vias alternativas de escrita estejam aprovados.
+
+Snapshot SQL independente, sem mutação:
+
+| Fixture | Status | Travado | Revisão | Itens | Data travamento |
+| --- | --- | --- | --- | --- | --- |
+| `...206` | rascunho | false | 0 | 1 (`...306`) | NULL |
+| `...207` | rascunho | false | 0 | 0 | NULL |
+| `...208` | publicado | false | 0 | 1 (`...308`) | NULL |
+
+Os itens, cabeçalhos, datas e observações foram consultados integralmente nesta auditoria, sem reproduzir dados de conexão ou JWT. No momento da consulta T01/T04 ainda não haviam alterado a fixture 206.
+
+**Próxima sequência recomendada, não executada pelo auditor:** testar T06 com `...207` (deve rejeitar), depois T01 com `...206` revisão 0 (esperado publicado/revisão 1), T02 e T03 com revisão antiga (esperado P0001), T04 com revisão 1 (esperado travado/revisão 2) e T05 de imutabilidade. Executar as transições positivas somente com JWT Admin real autorizado na branch descartável, uma única vez cada. Após cada operação, reconciliar o estado em SELECT independente antes de repetir qualquer pedido. PR #2 permanece sujeita aos gates pendentes, sem merge/produção.
