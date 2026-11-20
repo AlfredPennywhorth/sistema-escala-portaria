@@ -68,3 +68,16 @@ test('Neon legacy scale service fails closed for every write route', () => {
       method + ' must not write directly');
   }
 });
+
+test('Neon restriction period queries honor both bounds and weekday recurrences', () => {
+  const source = read('src/services/neon/restricoesService.ts');
+  for (const name of ['listarRestricoesPorAuxiliarEPeriodo', 'listarRestricoesPorPeriodo']) {
+    const start = source.indexOf('export async function ' + name + '(');
+    assert.ok(start >= 0, name + ' missing');
+    const next = source.indexOf('export async function ', start + 1);
+    const block = source.slice(start, next < 0 ? undefined : next);
+    assert.match(block, /dataFim: string/);
+    assert.match(block, /and\(data\.gte\.\$\{dataInicio\},data\.lte\.\$\{dataFim\}\)/);
+    assert.match(block, /and\(data\.is\.null,dia_semana\.not\.is\.null\)/);
+  }
+});
