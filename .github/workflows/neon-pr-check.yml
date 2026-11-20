@@ -3,6 +3,8 @@ on:
   pull_request:
     paths:
       - 'src/**'
+      - 'migration/neon/**'
+      - 'tests/neon-contracts.test.mjs'
       - 'package.json'
       - 'tsconfig*.json'
       - '.github/workflows/neon-pr-check.yml'
@@ -41,5 +43,7 @@ jobs:
         env:
           CF_PAGES: '1'
           CF_PAGES_BRANCH: chore/neon-migration-prep-20261115
+      - name: Check Neon OCC and authorization contracts (static, offline)
+        run: node --test tests/neon-contracts.test.mjs
       - name: ESLint
         run: npm run lint
