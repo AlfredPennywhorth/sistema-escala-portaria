@@ -53,3 +53,17 @@ A criação de rascunho **não é idempotente**; falha de transporte depois do C
 `tests/neon-contracts.test.mjs` foi ampliado com as verificações estáticas dos adaptadores. Estas verificações **não equivalem** a testes PostgreSQL/JWT real e não provam a semântica de concorrência ou RLS. A SQL 06 permanece não aplicada em qualquer branch do Neon.
 
 Ainda pendente: revisão técnica das propostas; teste de JWT real na branch descartável; revisão de autorização `SECURITY DEFINER`/RLS antes de qualquer revogação coordenada; fechamento de todas as vias DML e RPC legada; integração funcional e dados reais.
+
+## Revisão adicional de segurança — 20/11/2026
+
+**Ponto crítico detectado:** `criarClienteNeon()` usa `VITE_NEON_AUTH_URL` e `VITE_NEON_DATA_API_URL` da HML principal no build padrão, portanto não era suficiente verificar apenas `VITE_NEON_HOMOLOGACAO_ENABLED`.
+
+Correção na PR #2: o adaptador `rodizioAdminSql06HmlService.ts` passou a exigir cumulativamente `VITE_NEON_SQL06_ENABLED='true'`, `VITE_NEON_HOMOLOGACAO_ENABLED='true'` e correspondência **exata** dos endpoints públicos de autenticação e dados do compute `ep-nameless-dust-b6271958`, vinculado à branch descartável `br-holy-term-b6v6ofea`. O build padrão da Cloudflare HML **não habilita** `VITE_NEON_SQL06_ENABLED`. Verificações estáticas adicionadas ao CI.
+
+Essas flags no browser são guardas operacionais, não fronteiras de segurança: autorização definitiva deve permanecer em JWT/RLS/RPC no banco. O código segue sem ligação à UI, e a SQL 06 segue **não aplicada**. Revalidar endpoints e IDs de branch antes da futura instalação. A revisão corrigiu ainda a validação de data ISO no adaptador para não interpretar anos 00–99 como 1900–1999.
+
+### Dependências pendentes
+- Revisão independente de SQL06 e plano de migração coordenada para menor privilégio.
+- Autorização específica antes de executar SQL06 na branch descartável.
+- Homologação JWT real / concurrência / baseline / rollback.
+- Origem e backup dos dados reais, migração funcional, CI E2E e Go/No-Go final.
