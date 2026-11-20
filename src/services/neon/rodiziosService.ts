@@ -190,248 +190,45 @@ export async function registrarHistoricoRealizado(
   return { data: null, error: 'Registro de histórico travado indisponível na homologação Neon. Preserve os registros anteriores.' };
 }
 
-export async function criarRodizio(input: RodizioInput): Promise<ServiceResult<Rodizio>> {
-  if (!input.titulo?.trim()) {
-    return { data: null, error: 'Título é obrigatório' };
-  }
+/**
+ * Rotas legadas de escrita intencionalmente desabilitadas.
+ * A integração futura deverá usar RPCs atômicas, com JWT e revisão original,
+ * após fechamento de privilégios DML diretos e homologação de cada transição.
+ * Não reintroduzir fallback DELETE/INSERT nem UPDATE sem OCC nesta camada.
+ */
+const ESCRITA_BLOQUEADA = 'Escrita Neon indisponível nesta camada legada. Use somente as RPCs versionadas após homologação e autorização da migração.';
 
-  if (!input.data_inicio) {
-    return { data: null, error: 'Data de início é obrigatória' };
-  }
-
-  if (!input.data_fim) {
-    return { data: null, error: 'Data de fim é obrigatória' };
-  }
-
-  try {
-    const { data, error } = await criarClienteNeon()
-      .from('rodizios')
-      .insert({
-        titulo: input.titulo.trim(),
-        data_inicio: input.data_inicio,
-        data_fim: input.data_fim,
-        status: 'rascunho',
-        travado: false,
-        observacoes: input.observacoes ?? null,
-      })
-      .select()
-      .single();
-
-    if (error) {
-      return { data: null, error: error.message };
-    }
-
-    return { data: data as Rodizio, error: null };
-  } catch {
-    return { data: null, error: 'Erro ao criar rodízio' };
-  }
+export async function criarRodizio(_input: RodizioInput): Promise<ServiceResult<Rodizio>> {
+  void _input;
+  return { data: null, error: ESCRITA_BLOQUEADA };
 }
 
 export async function salvarItensRodizio(
-  rodizioId: string,
-  itens: RodizioItemInput[]
+  _rodizioId: string,
+  _itens: RodizioItemInput[],
 ): Promise<ServiceResult<RodizioItem[]>> {
-  try {
-    const { data: rodizioData, error: rodizioError } = await criarClienteNeon()
-      .from('rodizios')
-      .select('id, travado, status')
-      .eq('id', rodizioId)
-      .single();
-
-    if (rodizioError) {
-      return { data: null, error: rodizioError.message };
-    }
-
-    if (rodizioData.travado) {
-      return { data: null, error: 'Não é permitido alterar itens de um rodízio travado' };
-    }
-
-    const { error: deleteError } = await criarClienteNeon()
-      .from('rodizio_itens')
-      .delete()
-      .eq('rodizio_id', rodizioId);
-
-    if (deleteError) {
-      return { data: null, error: deleteError.message };
-    }
-
-    if (itens.length === 0) {
-      return { data: [], error: null };
-    }
-
-    const itensToInsert = itens.map(item => ({
-      rodizio_id: rodizioId,
-      data: item.data,
-      porta: item.porta,
-      periodo: item.periodo ?? null,
-      auxiliar_id: item.auxiliar_id ?? null,
-      observacoes: item.observacoes ?? null,
-    }));
-
-    const { data, error } = await criarClienteNeon()
-      .from('rodizio_itens')
-      .insert(itensToInsert)
-      .select();
-
-    if (error) {
-      return { data: null, error: error.message };
-    }
-
-    return { data: data as RodizioItem[], error: null };
-  } catch {
-    return { data: null, error: 'Erro ao salvar itens do rodízio' };
-  }
+  void _rodizioId; void _itens;
+  return { data: null, error: ESCRITA_BLOQUEADA };
 }
 
-export async function publicarRodizio(rodizioId: string): Promise<ServiceResult<Rodizio>> {
-  try {
-    const { data: rodizioData, error: rodizioError } = await criarClienteNeon()
-      .from('rodizios')
-      .select('id, travado, status')
-      .eq('id', rodizioId)
-      .single();
-
-    if (rodizioError) {
-      return { data: null, error: rodizioError.message };
-    }
-
-    if (rodizioData.travado) {
-      return { data: null, error: 'Rodízio travado não pode ser publicado diretamente' };
-    }
-
-    const { data, error } = await criarClienteNeon()
-      .from('rodizios')
-      .update({ status: 'publicado' })
-      .eq('id', rodizioId)
-      .select()
-      .single();
-
-    if (error) {
-      return { data: null, error: error.message };
-    }
-
-    return { data: data as Rodizio, error: null };
-  } catch {
-    return { data: null, error: 'Erro ao publicar rodízio' };
-  }
+export async function publicarRodizio(_rodizioId: string): Promise<ServiceResult<Rodizio>> {
+  void _rodizioId;
+  return { data: null, error: ESCRITA_BLOQUEADA };
 }
 
-export async function travarRodizio(rodizioId: string): Promise<ServiceResult<Rodizio>> {
-  try {
-    const { data: rodizioData, error: rodizioError } = await criarClienteNeon()
-      .from('rodizios')
-      .select('id, travado, status')
-      .eq('id', rodizioId)
-      .single();
-
-    if (rodizioError) {
-      return { data: null, error: rodizioError.message };
-    }
-
-    if (rodizioData.travado) {
-      return { data: null, error: 'Rodízio já está travado' };
-    }
-
-    const { count, error: countError } = await criarClienteNeon()
-      .from('rodizio_itens')
-      .select('*', { count: 'exact', head: true })
-      .eq('rodizio_id', rodizioId);
-
-    if (countError) {
-      return { data: null, error: countError.message };
-    }
-
-    if (count === 0) {
-      return { data: null, error: 'Não é possível travar um rodízio sem itens. Adicione pelo menos um item antes de travar.' };
-    }
-
-    const { data, error } = await criarClienteNeon()
-      .from('rodizios')
-      .update({
-        status: 'travado',
-        travado: true,
-        travado_em: new Date().toISOString(),
-      })
-      .eq('id', rodizioId)
-      .select()
-      .single();
-
-    if (error) {
-      return { data: null, error: error.message };
-    }
-
-    return { data: data as Rodizio, error: null };
-  } catch {
-    return { data: null, error: 'Erro ao travar rodízio' };
-  }
+export async function travarRodizio(_rodizioId: string): Promise<ServiceResult<Rodizio>> {
+  void _rodizioId;
+  return { data: null, error: ESCRITA_BLOQUEADA };
 }
 
-export async function cancelarRodizio(rodizioId: string): Promise<ServiceResult<Rodizio>> {
-  try {
-    const { data: rodizioData, error: rodizioError } = await criarClienteNeon()
-      .from('rodizios')
-      .select('id, travado')
-      .eq('id', rodizioId)
-      .single();
-
-    if (rodizioError) {
-      return { data: null, error: rodizioError.message };
-    }
-
-    if (rodizioData.travado) {
-      return { data: null, error: 'Rodízio travado não pode ser cancelado' };
-    }
-
-    const { data, error } = await criarClienteNeon()
-      .from('rodizios')
-      .update({ status: 'cancelado' })
-      .eq('id', rodizioId)
-      .select()
-      .single();
-
-    if (error) {
-      return { data: null, error: error.message };
-    }
-
-    return { data: data as Rodizio, error: null };
-  } catch {
-    return { data: null, error: 'Erro ao cancelar rodízio' };
-  }
+export async function cancelarRodizio(_rodizioId: string): Promise<ServiceResult<Rodizio>> {
+  void _rodizioId;
+  return { data: null, error: ESCRITA_BLOQUEADA };
 }
 
-export async function excluirRodizioRascunho(rodizioId: string): Promise<ServiceResult<null>> {
-  try {
-    const { data: rodizioData, error: rodizioError } = await criarClienteNeon()
-      .from('rodizios')
-      .select('id, status, travado')
-      .eq('id', rodizioId)
-      .single();
-
-    if (rodizioError) {
-      return { data: null, error: rodizioError.message };
-    }
-
-    if (rodizioData.status !== 'rascunho') {
-      return { data: null, error: 'Apenas rodízios em rascunho podem ser excluídos' };
-    }
-
-    if (rodizioData.travado) {
-      return { data: null, error: 'Rodízio travado não pode ser excluído' };
-    }
-
-    const { error } = await criarClienteNeon()
-      .from('rodizios')
-      .delete()
-      .eq('id', rodizioId);
-
-    if (error) {
-      return { data: null, error: error.message };
-    }
-
-    return { data: null, error: null };
-  } catch {
-    return { data: null, error: 'Erro ao excluir rodízio' };
-  }
+export async function excluirRodizioRascunho(_rodizioId: string): Promise<ServiceResult<null>> {
+  void _rodizioId;
+  return { data: null, error: ESCRITA_BLOQUEADA };
 }
 
 export async function buscarRodizioPorMesAno(ano: number, mes: number): Promise<ServiceResult<RodizioComItens | null>> {
