@@ -132,3 +132,22 @@ test('SQL06 proposed admin RPCs enforce JWT, lock, revision and conservative sta
   assert.match(source, /p_data_inicio > p_data_fim/);
   assert.match(source, /data < p_data_inicio OR data > p_data_fim/);
 });
+
+test('SQL06 HML adapters require Admin JWT, OCC and no fallback DML', () => {
+  const source = read('src/services/neon/rodizioAdminSql06HmlService.ts');
+  assert.match(source, /VITE_NEON_HOMOLOGACAO_ENABLED\s*!==\s*'true'/);
+  assert.match(source, /perfil\.data\?\.perfil !== 'admin'/);
+  assert.match(source, /p_revisao_esperada: revisaoOriginal/);
+  assert.match(source, /Conflito de revisão/);
+  assert.match(source, /Resultado indeterminado/);
+  assert.match(source, /Criação NÃO é idempotente/);
+  for (const method of [
+    'criar_rodizio_rascunho_versionado',
+    'atualizar_cabecalho_rascunho_versionado',
+    'cancelar_rodizio_versionado',
+    'excluir_rodizio_rascunho_versionado',
+  ]) {
+    assert.match(source, new RegExp("'"+method+"'"));
+  }
+  assert.doesNotMatch(source, /\.(?:insert|update|delete|upsert)\s*\(/);
+});
