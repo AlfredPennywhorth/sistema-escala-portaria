@@ -64,3 +64,17 @@ Snapshot SQL independente, sem mutação:
 Os itens, cabeçalhos, datas e observações foram consultados integralmente nesta auditoria, sem reproduzir dados de conexão ou JWT. No momento da consulta T01/T04 ainda não haviam alterado a fixture 206.
 
 **Próxima sequência recomendada, não executada pelo auditor:** testar T06 com `...207` (deve rejeitar), depois T01 com `...206` revisão 0 (esperado publicado/revisão 1), T02 e T03 com revisão antiga (esperado P0001), T04 com revisão 1 (esperado travado/revisão 2) e T05 de imutabilidade. Executar as transições positivas somente com JWT Admin real autorizado na branch descartável, uma única vez cada. Após cada operação, reconciliar o estado em SELECT independente antes de repetir qualquer pedido. PR #2 permanece sujeita aos gates pendentes, sem merge/produção.
+
+## Evidências de campo e reconciliação SQL — 20/11/2026, 17h35–17h36 BRT
+
+Capturas de tela do usuário: sessão Admin válida, bloqueio da fixture vazia `...207` pelo erro PostgreSQL `22023` (revisão 0 preservada), transição de travamento `...206` com revisão 1 → 2, resultado `travado`, retorno 2. Houve também mensagens de fixture divergente/já utilizada, testes negativos acessados com perfil inadequado, encerramento de sessão e `Sessão sem perfil confirmado`; estas últimas não comprovam falha de RLS nem devem ser contabilizadas como T02/T03 sem código e contexto específicos.
+
+**SELECT independente posterior no Neon `br-holy-term-b6v6ofea`:**
+
+| Fixture | Estado final | Travado | Revisão | Itens | travado_em |
+|---|---|---|---|---|---|
+| `...206` | travado | true | 2 | 1 (`...306`) | 2026-11-20 20:35:58.109 UTC |
+| `...207` | rascunho | false | 0 | 0 | NULL |
+| `...208` | publicado | false | 0 | 1 (`...308`) | NULL |
+
+O conteúdo do item `...306` e do item `...308` permanece compatível com snapshot anterior. A passagem intermediária `...206` pela revisão 1 é suportada pelas capturas da operação de travamento, mas não foi objeto de SELECT independente naquele instante. Resultado: **T06 aprovado; T04 aprovado; T01 aprovado quanto ao estado final/fluxo observado; T02/T03/T05 e demais casos não foram comprovados nesta rodada.** Não repetir publicação/travamento da fixture 206, que está travada. Não promover a PR #2 nem conectar essas RPCs à UI operacional até fechamento das vias alternativas de escrita e dos gates restantes.
