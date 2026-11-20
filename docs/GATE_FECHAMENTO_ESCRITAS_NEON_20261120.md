@@ -30,3 +30,12 @@ Esta nota e o código de adaptador são exclusivamente alterações na PR #2 em 
 - Novo teste `tests/neon-contracts.test.mjs` verifica guardas estáticos de autorização, revisão OCC, cautela contra repetição de RPC e bloqueio das seis escritas legadas. Workflow de PR atualizado para rodá-lo e considerar alterações em `migration/neon/**`.
 - **Importante:** controles estáticos não substituem SQL com JWT real, concorrência e migração. DML direto na Data API e RPC não versionada **continuam disponíveis no banco descartável**. Não marcar o gate sistêmico como fechado.
 - Próximo pacote de execução: novas RPCs de todas as mutações administrativas, revisão de `SECURITY DEFINER`, concessões mínimas e retirada **atômica** de DML direto e EXECUTE legado numa branch descartável, após autorização específica e testes de integração.
+
+## Auditoria de superfície efetiva do banco — 20/11/2026 (somente leitura)
+Consultadas `pg_policies`, `pg_proc` e permissões efetivas na branch descartável `br-holy-term-b6v6ofea`. Há RLS ativa nas cinco tabelas de negócio. Para `authenticated`, `rodizios` e `rodizio_itens` continuam com INSERT/UPDATE/DELETE diretos; as policies autorizam essas escritas para Admin em escala não travada, sem conferência geral da coluna `revisao`. A RPC legada `substituir_itens_rodizio_rascunho(uuid,jsonb)` continua executável por `authenticated` e não exige revisão original. RPCs versionadas de substituir, publicar e travar são SECURITY INVOKER. Não foram feitas mutações nesse diagnóstico.
+
+Novo preflight reproduzível: `migration/neon/tests/06_write_surface_audit_readonly.sql`; só consulta catálogos, sinaliza bypasses potenciais e não altera privilégios. **Gate de escrita do banco permanece aberto**, apesar do bloqueio fail-closed de seis métodos no serviço Neon e do CI de contrato.
+
+Correção funcional isolada: `src/services/neon/restricoesService.ts` passou a respeitar limite superior `dataFim` em duas consultas por período sem excluir restrições recorrentes (data NULL com dia_semana presente); adicionada verificação de contrato em `tests/neon-contracts.test.mjs`. Atenção: o serviço legado Supabase ainda mantém o comportamento antigo, e a homologação por JWT dessa mudança funcional permanece pendente.
+
+Próximo gate exige planejar e revisar **todas** as RPCs administrativas de escrita, executar migração coordenada de privilégios em branch descartável, comprovar JWT real e concorrência; não retirar grants isoladamente.
