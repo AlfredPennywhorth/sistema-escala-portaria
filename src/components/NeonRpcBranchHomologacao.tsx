@@ -153,11 +153,11 @@ export function NeonRpcBranchHomologacao() {
 
 
   async function executarTransicaoVersionada(
-    operacao: 'publicar' | 'travar' | 'vazio' | 'negativa',
+    operacao: 'publicar' | 'travar' | 'vazio' | 'negativa-publicar' | 'negativa-travar',
   ) {
     const sessao = await perfilAtual();
     if (!sessao) return;
-    const negativa = operacao === 'negativa';
+    const negativa = operacao === 'negativa-publicar' || operacao === 'negativa-travar';
     if (negativa && sessao.perfil === 'admin') {
       setMensagem('Entre como Auxiliar ou Coordenadora para a negativa por perfil.');
       return;
@@ -199,7 +199,7 @@ export function NeonRpcBranchHomologacao() {
       }
     }
 
-    const fn = operacao === 'travar'
+    const fn = operacao === 'travar' || operacao === 'negativa-travar'
       ? 'travar_rodizio_versionado' : 'publicar_rodizio_versionado';
     const resposta = await CLIENTE.rpc(fn, {
       p_rodizio_id: id,
@@ -301,12 +301,16 @@ export function NeonRpcBranchHomologacao() {
           <h2 className="text-lg font-semibold">SQL 05 — transições com JWT real</h2>
           <p className="text-xs text-amber-900">
             Apenas fixtures 206 e 207, nunca produção. Execute as negativas
-            com Auxiliar/Coordenadora antes dos positivos. Admin: publicar
+            com Auxiliar/Coordenadora, para publicar e travar, antes dos positivos. Admin: publicar
             somente uma vez e depois travar somente uma vez.
           </p>
           <button type="button" disabled={ocupado} className="w-full rounded-md border p-3 disabled:opacity-50"
-            onClick={() => void executar(() => executarTransicaoVersionada('negativa'))}>
-            T10/T11 — Negativa por perfil (Auxiliar/Coordenadora)
+            onClick={() => void executar(() => executarTransicaoVersionada('negativa-publicar'))}>
+            T10/T11 — Negar publicação (Auxiliar/Coordenadora)
+          </button>
+          <button type="button" disabled={ocupado} className="w-full rounded-md border p-3 disabled:opacity-50"
+            onClick={() => void executar(() => executarTransicaoVersionada('negativa-travar'))}>
+            T10/T11 — Negar travamento (Auxiliar/Coordenadora)
           </button>
           <button type="button" disabled={ocupado} className="w-full rounded-md border p-3 disabled:opacity-50"
             onClick={() => void executar(() => executarTransicaoVersionada('vazio'))}>
