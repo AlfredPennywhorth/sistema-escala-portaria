@@ -78,3 +78,22 @@ Capturas de tela do usuário: sessão Admin válida, bloqueio da fixture vazia `
 | `...208` | publicado | false | 0 | 1 (`...308`) | NULL |
 
 O conteúdo do item `...306` e do item `...308` permanece compatível com snapshot anterior. A passagem intermediária `...206` pela revisão 1 é suportada pelas capturas da operação de travamento, mas não foi objeto de SELECT independente naquele instante. Resultado: **T06 aprovado; T04 aprovado; T01 aprovado quanto ao estado final/fluxo observado; T02/T03/T05 e demais casos não foram comprovados nesta rodada.** Não repetir publicação/travamento da fixture 206, que está travada. Não promover a PR #2 nem conectar essas RPCs à UI operacional até fechamento das vias alternativas de escrita e dos gates restantes.
+
+## T05 — Verificação de imutabilidade por gatilhos (20/11/2026)
+
+**Branch exclusivamente descartável:** `br-holy-term-b6v6ofea`, banco `rodizio_portas`. Fixture de cabeçalho `...206` e item `...306`. Nenhuma operação foi feita na branch mãe nem em produção.
+
+Inspeção dos gatilhos:
+- `trg_bloquear_rodizio_travado`: BEFORE UPDATE/DELETE de `rodizios`, função `bloquear_modificacao_rodizio_travado`.
+- `trg_bloquear_itens_travados`: BEFORE INSERT/UPDATE/DELETE de `rodizio_itens`, função `bloquear_modificacao_itens_travados`.
+- Ambas as funções consultadas em `pg_get_functiondef`, gatilhos habilitados.
+
+Testes com conexão administrativa SQL, mantendo os valores originais para evitar mudança de conteúdo mesmo se um gatilho falhasse:
+1. `UPDATE public.rodizios SET observacoes=observacoes WHERE id='...206'` → rejeitado `P0001`, “Rodízio travado não pode ser alterado”.
+2. `UPDATE public.rodizio_itens SET observacoes=observacoes WHERE id='...306'` → rejeitado `P0001`, “Item de histórico travado não pode ser alterado”.
+
+SELECT independente após ambas as recusas: fixture 206 ainda `travado=true`, `status=travado`, `revisao=2`, `travado_em=2026-11-20T20:35:58.109Z`, um item 306 com conteúdo íntegro. Fixtures 207 e 208 inalteradas.
+
+**Resultado T05:** APROVADO para proteção de UPDATE de cabeçalho e item por trigger, mesmo sob conexão proprietária. **Não comprova** INSERT/DELETE, movimentação de itens entre escalas ou a sessão JWT real. `authenticated` ainda possui privilégios de tabela UPDATE e DELETE, sujeitos a RLS; os caminhos alternativos de escrita continuam como gate sistêmico pendente. Não declarar T05 completo em todas as modalidades até os testes restantes.
+
+Próximo passo: testes específicos de inserção, exclusão, movimentação e autorização JWT na branch descartável, seguidos de testes de concorrência e fechamento das vias alternativas de escrita. Sem merge ou publicação operacional.
