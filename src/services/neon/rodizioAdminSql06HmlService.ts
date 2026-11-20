@@ -23,7 +23,13 @@ function intervaloValido(inicio: string, fim: string): boolean {
   // Date.UTC rejects timezone ambiguity; roundtrip rejects invalid dates.
   const valido = (d: string) => {
     const [ano, mes, dia] = d.split('-').map(Number);
-    const dt = new Date(Date.UTC(ano, mes - 1, dia));
+    // Date.UTC(0..99, ...) interpreta o ano como 1900..1999.
+    // Construir primeiro e definir o ano integral evita essa coerção.
+    if (ano < 1 || ano > 9999 || mes < 1 || mes > 12 || dia < 1 || dia > 31) {
+      return false;
+    }
+    const dt = new Date(0);
+    dt.setUTCFullYear(ano, mes - 1, dia);
     return dt.toISOString().slice(0, 10) === d;
   };
   return valido(inicio) && valido(fim);
