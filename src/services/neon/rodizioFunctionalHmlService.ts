@@ -1,5 +1,5 @@
 import { criarClienteNeon } from '../../lib/neon';
-import { substituirItensRascunhoNeonHml } from './rodizioDraftWriteService';
+import { substituirItensRascunhoVersionadosNeonHml } from './rodizioDraftVersionedWriteService';
 import type { Rodizio, RodizioComItens, RodizioItem, RodizioItemInput, ServiceResult } from '../../types/supabase';
 
 const MAX_ITENS_LEITURA = 500;
@@ -90,7 +90,9 @@ export async function obterRodizioComItensNeonHml(
  * Único caminho planejado para salvar rascunhos no Neon:
  * - senha e JWT nunca trafegam pelo serviço;
  * - validação e SELECT de estado são auxiliares, segurança real é no banco;
- * - operação atômica via RPC; não fazer DELETE seguido de INSERT;
+ * - revisão original obrigatória e validada sob lock; nunca atualizar
+ *   silenciosamente a revisão do editor;
+ * - operação atômica via RPC versionada; não fazer DELETE seguido de INSERT;
  * - se falhar ou a resposta for incerta, o chamador deve reconciliar
  *   o estado com nova consulta, jamais repetir automaticamente.
  *
@@ -100,9 +102,13 @@ export async function obterRodizioComItensNeonHml(
 export async function salvarRascunhoAtomicoNeonHml(
   rodizioId: string,
   itens: RodizioItemInput[],
+  revisaoOriginal: number,
 ): Promise<ServiceResult<RodizioComItens>> {
   const acesso = await exigirAdministrador();
   if (acesso.error) return { data: null, error: acesso.error };
+  if (!Number.isSafeInteger(revisaoOriginal) || revisaoOriginal < 0 || revisaoOriginal >= Number.MAX_SAFE_INTEGER) {
+    return { data: null, error: 'Revisão original inválida ou ausente.' };
+  }
   const anterior = await obterRodizioComItensNeonHml(rodizioId);
   if (anterior.error) return { data: null, error: anterior.error };
   if (!anterior.data || anterior.data.rodizio.status !== 'rascunho' ||
@@ -110,7 +116,9 @@ export async function salvarRascunhoAtomicoNeonHml(
     return { data: null, error: 'Somente rascunhos não travados podem ser substituídos.' };
   }
 
-  const escrita = await substituirItensRascunhoNeonHml(rodizioId, itens);
+  // revisaoOriginal foi capturada ao abrir o editor; nunca substituí-la
+  // por uma revisão fresca buscada neste método.
+  const escrita = await substituirItensRascunhoVersionadosNeonHml(rodizioId, itens, revisaoOriginal);
   if (escrita.error) {
     return {
       data: null,
@@ -126,7 +134,9 @@ export async function salvarRascunhoAtomicoNeonHml(
         (posterior.error || 'escala inacessível'),
     };
   }
-  if (posterior.data.itens.length !== itens.length) {
+  const revisaoPosterior = (posterior.data.rodizio as Rodizio & { revisao?: number | string }).revisao;
+  if (posterior.data.itens.length !== itens.length ||
+      String(revisaoPosterior) !== String(revisaoOriginal + 1)) {
     return {
       data: null,
       error: 'RPC retornou sucesso, porém contagem divergente. Conferir banco antes de repetir.',
