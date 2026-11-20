@@ -95,7 +95,9 @@ interface CabecalhoRascunho {
 }
 
 function validarCabecalho(input: CabecalhoRascunho): boolean {
-  return typeof input.titulo === 'string' &&
+  // Dados externos podem chegar nulos mesmo que TypeScript declare um objeto.
+  return input !== null && typeof input === 'object' &&
+    typeof input.titulo === 'string' &&
     input.titulo.trim().length > 0 && input.titulo.trim().length <= 200 &&
     typeof input.dataInicio === 'string' && typeof input.dataFim === 'string' &&
     intervaloValido(input.dataInicio, input.dataFim) &&
