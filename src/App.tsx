@@ -61,7 +61,14 @@ export function App() {
   if (import.meta.env.VITE_NEON_HOMOLOGACAO_ENABLED === 'true') {
     // A rota da RPC usa Auth/Data API da branch DESCARTAVEL, nunca a principal.
     // Evita expor o piloto no dominio de producao mesmo com flag acidental.
-    if (window.location.hostname === 'rodizio-portaria-neon-hml.pages.dev' &&
+    // Cloudflare Pages gera hosts próprios para cada deployment preview,
+    // ex.: aff92e86.rodizio-portaria-neon-hml.pages.dev.
+    // Restringir ao projeto Neon HML e exigir opt-in explícito na URL.
+    // Nunca habilitar em rodizio-portaria.pages.dev ou em domínio externo.
+    const hostname = window.location.hostname.toLowerCase();
+    const hostnameHml = hostname === 'rodizio-portaria-neon-hml.pages.dev' ||
+      /^[a-z0-9-]+\\.rodizio-portaria-neon-hml\\.pages\\.dev$/.test(hostname);
+    if (hostnameHml &&
         new URLSearchParams(window.location.search).get('rpc-branch-test') === '1') {
       return <NeonRpcBranchHomologacao />;
     }
