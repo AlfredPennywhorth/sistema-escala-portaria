@@ -93,3 +93,11 @@ Usuário forneceu capturas da tela de homologação isolada. Sessão JWT válida
 A nova seção SQL06 **já estava publicada e acessível** no teste de campo. O botão somente leitura produziu aviso de ausência de gravações, exibiu ao perfil Auxiliar as fixtures 206 (travado, revisão 2, um item) e 208 (publicado, revisão 0, um item); a fixture 207, em rascunho, não foi exibida, conforme a RLS. A interface qualificou corretamente a visão de RLS como parcial. Uma consulta independente SELECT no PostgreSQL da mesma branch confirmou 206 = travado/revisão 2/um item, 207 = rascunho/revisão 0/zero itens, 208 = publicado/revisão 0/um item.
 
 **Resultado deste gate parcial:** preflight SQL06 de leitura com JWT Auxiliar aprovado; negativas SQL05 por Auxiliar aprovadas. Permanecem pendentes JWT Admin para preflight completo, negativas específicas das quatro novas funções SQL06 por perfis não-admin, testes positivos em novas fixtures, concorrência, idempotência, timeout e fechamento do DML direto. Nenhuma mutação SQL06 autorizada ou executada nesta rodada.
+
+## Evidência de campo — Administrador / Preflight SQL06 (20/11/2026)
+
+Captura fornecida pelo usuário: autenticação JWT na branch descartável, perfil `admin`, resultado da interface `preflight de dados aprovado` e indicação `SQL06: apenas SELECT — sem chamada RPC`. Foram visualizadas as três fixtures: 206 travado/revisão 2/um item, 207 rascunho/revisão 0/zero itens, 208 publicado/revisão 0/um item.
+
+Reconciliado por SELECT independente na mesma branch `br-holy-term-b6v6ofea`: os três IDs permanecem exatamente nesses estados/revisões e quantidades. Nenhuma mutação realizada. PR #2 permanece draft, sem merge.
+
+**Conclusão:** pré-homologação de leitura SQL06 com JWT Admin e Auxiliar concluída nos dois perfis testados. Coordenadora, negativas específicas das RPCs SQL06, positivos em novas fixtures, concorrência, rollback e fechamento de escrita direta seguem pendentes. Não repetir SQL05 T01/T04.
