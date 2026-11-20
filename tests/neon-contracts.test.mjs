@@ -151,3 +151,14 @@ test('SQL06 HML adapters require Admin JWT, OCC and no fallback DML', () => {
   }
   assert.doesNotMatch(source, /\.(?:insert|update|delete|upsert)\s*\(/);
 });
+
+test('SQL06 mutation adapter is bound to the disposable Neon branch only', () => {
+  const source = read('src/services/neon/rodizioAdminSql06HmlService.ts');
+  assert.match(source, /VITE_NEON_SQL06_ENABLED\s*!==\s*'true'/);
+  assert.match(source, /VITE_NEON_AUTH_URL\s*!==\s*authEndpoint/);
+  assert.match(source, /VITE_NEON_DATA_API_URL\s*!==\s*dataEndpoint/);
+  assert.match(source, /ep-nameless-dust-b6271958\.neonauth/);
+  assert.match(source, /ep-nameless-dust-b6271958\.apirest/);
+  const build = read('scripts/build-cloudflare-homologacao.mjs');
+  assert.doesNotMatch(build, /VITE_NEON_SQL06_ENABLED:\s*'true'/);
+});
