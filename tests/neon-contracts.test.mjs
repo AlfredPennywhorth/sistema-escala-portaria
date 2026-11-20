@@ -102,3 +102,33 @@ test('No direct scale DML in Neon service modules', () => {
     }
   }
 });
+
+test('SQL06 proposed admin RPCs enforce JWT, lock, revision and conservative status', () => {
+  const source = read('migration/neon/06_remaining_admin_mutations_PROPOSAL.sql');
+  const methods = [
+    'criar_rodizio_rascunho_versionado',
+    'atualizar_cabecalho_rascunho_versionado',
+    'cancelar_rodizio_versionado',
+    'excluir_rodizio_rascunho_versionado',
+  ];
+  for (const method of methods) {
+    const start = source.indexOf('CREATE OR REPLACE FUNCTION public.' + method);
+    assert.ok(start >= 0, method + ' missing');
+    const next = source.indexOf('CREATE OR REPLACE FUNCTION', start + 1);
+    const body = source.slice(start, next < 0 ? undefined : next);
+    assert.match(body, /SECURITY INVOKER/i);
+    assert.match(body, /usuario_atual_id\(\)/);
+    assert.match(body, /usuario_tem_perfil\('admin'\)/);
+    assert.match(source, new RegExp('REVOKE ALL ON FUNCTION public\\.' + method));
+  }
+  for (const method of methods.slice(1)) {
+    const start = source.indexOf('CREATE OR REPLACE FUNCTION public.' + method);
+    const next = source.indexOf('CREATE OR REPLACE FUNCTION', start + 1);
+    const body = source.slice(start, next < 0 ? undefined : next);
+    assert.match(body, /FOR UPDATE/);
+    assert.match(body, /v_revisao IS DISTINCT FROM p_revisao_esperada/);
+    assert.match(body, /ERRCODE = 'P0001'/);
+  }
+  assert.match(source, /p_data_inicio > p_data_fim/);
+  assert.match(source, /data < p_data_inicio OR data > p_data_fim/);
+});
