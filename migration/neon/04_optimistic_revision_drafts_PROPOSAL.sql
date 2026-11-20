@@ -60,16 +60,17 @@ begin
     raise exception 'Escala nao encontrada ou inacessivel'
       using errcode = 'P0002';
   end if;
-  if v_travado or v_status <> 'rascunho' then
-    raise exception 'Substituicao permitida somente em escala em rascunho nao travada'
-      using errcode = '42501';
-  end if;
-
-  -- Checagem OCC feita sob o MESMO row lock; outro cliente que abriu
-  -- revisao anterior recebe conflito, sem apagar nenhum item.
+  -- Conferir OCC ANTES da validação de estado: se outra operação
+  -- publicou/travou a escala desde que o editor a abriu, devolver P0001
+  -- em vez de 42501. Ambos os testes ocorrem sob o mesmo row lock.
   if v_revisao_atual is distinct from p_revisao_esperada then
     raise exception 'Conflito de revisao. Atual %, esperada %', v_revisao_atual, p_revisao_esperada
       using errcode = 'P0001';
+  end if;
+
+  if v_travado or v_status <> 'rascunho' then
+    raise exception 'Substituicao permitida somente em escala em rascunho nao travada'
+      using errcode = '42501';
   end if;
 
   -- Validacao do JSON ANTES de remover os itens. Campos desconhecidos
