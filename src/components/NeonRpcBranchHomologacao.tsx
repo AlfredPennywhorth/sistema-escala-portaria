@@ -61,6 +61,65 @@ export function NeonRpcBranchHomologacao() {
     return { perfil: vinculo.data.perfil as Perfil, id: usuario.id };
   }
 
+  async function preflightSql06SomenteLeitura() {
+    // A autorização recebida permite a INSTALAÇÃO SQL06, não mutações
+    // de fixtures adicionais. Nenhuma função RPC é chamada neste preflight.
+    const sessao = await perfilAtual();
+    if (!sessao) return;
+    const ids = [
+      '00000000-0000-4000-8000-000000000206',
+      '00000000-0000-4000-8000-000000000207',
+      '00000000-0000-4000-8000-000000000208',
+    ];
+    const consulta = await CLIENTE.from('rodizios')
+      .select('id,titulo,status,travado,revisao,travado_em')
+      .in('id', ids)
+      .order('id', { ascending: true });
+    if (consulta.error) {
+      setMensagem('Preflight SQL06 inconclusivo: ' + consulta.error.message);
+      return;
+    }
+
+    // A RLS pode ocultar rascunhos para perfis não administrativos.
+    // Não interpretar linhas ausentes como objetos apagados.
+    const contagem = await CLIENTE.from('rodizio_itens')
+      .select('id,rodizio_id').in('rodizio_id', ids);
+    if (contagem.error) {
+      setMensagem('Falha na leitura dos itens (RLS ou conexão). Não executar escritas.');
+      return;
+    }
+    const quantidades = new Map<string, number>();
+    for (const item of contagem.data ?? []) {
+      quantidades.set(item.rodizio_id, (quantidades.get(item.rodizio_id) ?? 0) + 1);
+    }
+    const linhas = (consulta.data ?? []).map(item => ({
+      id: item.id,
+      status: item.status,
+      travado: item.travado,
+      revisao: item.revisao,
+      itensVisiveis: quantidades.get(item.id) ?? 0,
+    }));
+    const aprovacaoAdmin = sessao.perfil === 'admin' &&
+      linhas.length === 3 &&
+      linhas.some(item => item.id === ids[0] && item.status === 'travado' &&
+        item.travado === true && String(item.revisao) === '2' && item.itensVisiveis === 1) &&
+      linhas.some(item => item.id === ids[1] && item.status === 'rascunho' &&
+        item.travado === false && String(item.revisao) === '0' && item.itensVisiveis === 0) &&
+      linhas.some(item => item.id === ids[2] && item.status === 'publicado' &&
+        item.travado === false && String(item.revisao) === '0' && item.itensVisiveis === 1);
+    setResultado(JSON.stringify({
+      ambiente: 'Neon descartável br-holy-term-b6v6ofea',
+      fase: 'SQL06: apenas SELECT — sem chamada RPC',
+      perfil: sessao.perfil,
+      estado: sessao.perfil === 'admin'
+        ? (aprovacaoAdmin ? 'preflight de dados aprovado' : 'preflight divergente; conferir banco')
+        : 'leitura sujeita a RLS — não avaliar integridade com este perfil',
+      registrosVisiveis: linhas,
+      sql06: 'funções instaladas, porém nenhuma transição SQL06 executada nesta tela',
+    }, null, 2));
+    setMensagem('Somente leitura concluída. Não foram alterados dados.');
+  }
+
   async function executarProva(negativo: boolean) {
     const sessao = await perfilAtual();
     if (!sessao) return;
@@ -304,6 +363,19 @@ export function NeonRpcBranchHomologacao() {
             const perfil = await perfilAtual();
             if (perfil) setMensagem('Sessão válida na branch temporária: ' + perfil.perfil);
           })}>Verificar sessão e perfil</button>
+        <div className="border-t pt-4 space-y-2">
+          <h2 className="text-lg font-semibold">SQL 06 — pré-homologação</h2>
+          <p className="text-sm text-amber-900">
+            Apenas consulta das fixtures 206, 207 e 208. As quatro funções SQL 06
+            foram instaladas, mas testes de mutação exigem outro gate. Não criar,
+            editar, cancelar ou excluir escalas nesta etapa.
+          </p>
+          <button type="button" disabled={ocupado}
+            className="w-full rounded-md border border-blue-600 p-3 disabled:opacity-50"
+            onClick={() => void executar(preflightSql06SomenteLeitura)}>
+            SQL 06 — conferir fixtures (somente leitura)
+          </button>
+        </div>
         <button type="button" disabled={ocupado} className="w-full rounded-md border border-amber-500 p-3 disabled:opacity-50"
           onClick={() => void executar(() => executarProva(true))}>
           Testar negativa da RPC (Auxiliar ou Coordenadora)
