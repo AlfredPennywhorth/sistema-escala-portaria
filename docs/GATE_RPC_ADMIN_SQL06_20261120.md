@@ -85,3 +85,11 @@ Após a instalação SQL06 e sua reconciliação independente, a PR #2 recebeu u
 **Nenhuma função SQL06 é invocada nessa tela**. Testes de criação, edição, cancelamento e exclusão de fixtures novas aguardam autorização específica. O CI ganhou teste estático contra mutações no método de preflight. O domínio da tela permanece limitado ao Cloudflare Pages da HML de testes com opt-in `?rpc-branch-test=1`, que usa endpoints fixos da branch descartável.
 
 Status: código e teste adicionados à PR #2; publicação efetiva em Cloudflare e verificação JWT no navegador ainda não confirmadas nesta etapa. Os dados reais, HML principal e produção permanecem fora do escopo.
+
+## Evidência de campo — Auxiliar / SQL05 e SQL06 (20/11/2026)
+
+Usuário forneceu capturas da tela de homologação isolada. Sessão JWT válida no perfil `auxiliar` da branch descartável. Para SQL05, as capturas mostram rejeição pelo banco com SQLSTATE `42501` nos testes negativos de publicação e travamento (T10/T11); a RPC legada de escrita de itens também foi recusada com `42501`. Botões positivos Admin apresentaram corretamente restrição de perfil. Logout retornou ausência confirmada de sessão. Esses testes não demonstram negativação da SQL06 nova.
+
+A nova seção SQL06 **já estava publicada e acessível** no teste de campo. O botão somente leitura produziu aviso de ausência de gravações, exibiu ao perfil Auxiliar as fixtures 206 (travado, revisão 2, um item) e 208 (publicado, revisão 0, um item); a fixture 207, em rascunho, não foi exibida, conforme a RLS. A interface qualificou corretamente a visão de RLS como parcial. Uma consulta independente SELECT no PostgreSQL da mesma branch confirmou 206 = travado/revisão 2/um item, 207 = rascunho/revisão 0/zero itens, 208 = publicado/revisão 0/um item.
+
+**Resultado deste gate parcial:** preflight SQL06 de leitura com JWT Auxiliar aprovado; negativas SQL05 por Auxiliar aprovadas. Permanecem pendentes JWT Admin para preflight completo, negativas específicas das quatro novas funções SQL06 por perfis não-admin, testes positivos em novas fixtures, concorrência, idempotência, timeout e fechamento do DML direto. Nenhuma mutação SQL06 autorizada ou executada nesta rodada.
