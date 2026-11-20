@@ -77,3 +77,11 @@ Script reproduzível `migration/neon/tests/07_sql06_preflight_readonly.sql`; con
 Corrigido no TypeScript: validação de cabeçalho rejeita `null` e payloads não objetos (entrada externa pode não respeitar o tipo TS). Testes estáticos adicionados para garantir guarda e preflight read-only.
 
 **Estado:** preparada, não instalada, não homologada por JWT real. A aprovação do CI indica qualidade estática/build, não autorização para rodar DDL.
+
+## Tela temporária — Pré-homologação SQL 06 somente leitura
+
+Após a instalação SQL06 e sua reconciliação independente, a PR #2 recebeu uma seção na tela `NeonRpcBranchHomologacao` chamada **SQL 06 — pré-homologação**. O botão `SQL 06 — conferir fixtures (somente leitura)` utiliza a sessão JWT da branch descartável e executa apenas SELECTs em `rodizios` e `rodizio_itens`, com verificação dos estados/revisões esperados das fixtures 206 (travado/revisão 2/um item), 207 (rascunho/revisão 0/vazia) e 208 (publicado/revisão 0/um item). Com Auxiliar/Coordenadora, os resultados são expressamente qualificados como visão parcial da RLS.
+
+**Nenhuma função SQL06 é invocada nessa tela**. Testes de criação, edição, cancelamento e exclusão de fixtures novas aguardam autorização específica. O CI ganhou teste estático contra mutações no método de preflight. O domínio da tela permanece limitado ao Cloudflare Pages da HML de testes com opt-in `?rpc-branch-test=1`, que usa endpoints fixos da branch descartável.
+
+Status: código e teste adicionados à PR #2; publicação efetiva em Cloudflare e verificação JWT no navegador ainda não confirmadas nesta etapa. Os dados reais, HML principal e produção permanecem fora do escopo.
