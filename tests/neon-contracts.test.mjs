@@ -184,3 +184,19 @@ test('SQL06 preflight must remain strictly read-only', () => {
   assert.match(source, /SELECT current_database\(\)/i);
   assert.doesNotMatch(source, /\b(?:INSERT|UPDATE|DELETE|ALTER|CREATE|DROP|REVOKE|GRANT|TRUNCATE)\b/i);
 });
+
+test('SQL06 UI preflight does not invoke mutations and preserves SQL05 fixtures', () => {
+  const source = read('src/components/NeonRpcBranchHomologacao.tsx');
+  const start = source.indexOf('async function preflightSql06SomenteLeitura()');
+  const end = source.indexOf('async function executarProva(', start);
+  assert.ok(start > 0 && end > start, 'preflight should be independent');
+  const block = source.slice(start, end);
+  assert.match(block, /const sessao = await perfilAtual\(\)/);
+  assert.match(block, /\.from\('rodizios'\)/);
+  assert.match(block, /\.from\('rodizio_itens'\)/);
+  assert.doesNotMatch(block, /\.rpc\(|\.insert\(|\.update\(|\.delete\(|\.upsert\(/);
+  for (const id of ['000000000206', '000000000207', '000000000208']) {
+    assert.match(block, new RegExp(id));
+  }
+  assert.match(source, /SQL 06 — conferir fixtures \(somente leitura\)/);
+});
