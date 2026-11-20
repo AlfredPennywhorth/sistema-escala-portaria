@@ -160,9 +160,11 @@ export async function salvarRascunhoAtomicoNeonHml(
   const revisaoPosterior = (posterior.data.rodizio as Rodizio & { revisao?: number | string }).revisao;
   // A comparação de quantidade, sozinha, aceita um N+2 com o mesmo número
   // de linhas. Validar revisão e conteúdo esperado, sem confiar em IDs novos.
+  // PostgreSQL serializa UUID em minúsculas. A comparação deve ser
+  // sem distinção de caixa, inclusive para UUIDs enviados em maiúsculas.
   const chave = (item: RodizioItemInput) => JSON.stringify([
     item.data.slice(0, 10), item.porta.trim(), item.periodo || null,
-    item.auxiliar_id || null, item.observacoes ?? null,
+    item.auxiliar_id?.toLowerCase() || null, item.observacoes ?? null,
   ]);
   const esperados = itens.map(chave).sort();
   const encontrados = posterior.data.itens.map(item => chave(item)).sort();
