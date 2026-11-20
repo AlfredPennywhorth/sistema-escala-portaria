@@ -1,0 +1,53 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+
+const read = (path) => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
+const draft = read('migration/neon/04_optimistic_revision_drafts_PROPOSAL.sql');
+const transitions = read('migration/neon/05_versioned_publish_lock_PROPOSAL.sql');
+const draftClient = read('src/services/neon/rodizioDraftVersionedWriteService.ts');
+const statusClient = read('src/services/neon/rodizioStatusVersionedHmlService.ts');
+
+test('SQL04: autorização admin e OCC sob row lock antes de qualquer DELETE', () => {
+  assert.match(draft, /usuario_tem_perfil\('admin'\)/i);
+  assert.match(draft, /security invoker/i);
+  assert.match(draft, /for update\s*;/i);
+  assert.match(draft, /v_revisao_atual is distinct from p_revisao_esperada/i);
+  assert.match(draft, /using errcode = 'P0001'/i);
+  assert.ok(draft.indexOf('v_revisao_atual is distinct from p_revisao_esperada') <
+    draft.indexOf('delete from public.rodizio_itens'));
+  assert.match(draft, /set revisao = revisao \+ 1/i);
+  assert.match(draft, /REVOKE ALL ON FUNCTION public\.substituir_itens_rodizio_rascunho_versionado/i);
+});
+
+test('SQL05: publish and lock require admin, lock, version, and at least one item', () => {
+  for (const name of ['publicar_rodizio_versionado', 'travar_rodizio_versionado']) {
+    const start = transitions.indexOf('CREATE OR REPLACE FUNCTION public.' + name);
+    assert.ok(start >= 0, name + ' missing');
+    const next = transitions.indexOf('CREATE OR REPLACE FUNCTION', start + 1);
+    const block = transitions.slice(start, next < 0 ? undefined : next);
+    assert.match(block, /SECURITY INVOKER/i);
+    assert.match(block, /usuario_tem_perfil\('admin'\)/i);
+    assert.match(block, /FOR UPDATE\s*;/i);
+    assert.match(block, /v_revisao IS DISTINCT FROM p_revisao_esperada/i);
+    assert.match(block, /IF NOT EXISTS\s*\(\s*SELECT 1 FROM public\.rodizio_itens/i);
+    assert.match(block, /revisao = revisao \+ 1/i);
+    assert.match(transitions, new RegExp('REVOKE ALL ON FUNCTION public\\.' + name));
+  }
+});
+
+test('Neon adapters require original revision and disallow blind retry', () => {
+  assert.match(draftClient, /Number\.isSafeInteger\(revisaoEsperada\)/);
+  assert.match(draftClient, /p_revisao_esperada: revisaoEsperada/);
+  assert.match(draftClient, /Resposta indeterminada da RPC/);
+  assert.match(statusClient, /Number\.isSafeInteger\(revisaoOriginal\)/);
+  assert.match(statusClient, /p_revisao_esperada: revisaoOriginal/);
+  assert.match(statusClient, /Falha de transporte com resultado indeterminado/);
+});
+
+test('HML-only guards remain enforced on mutation adapters', () => {
+  for (const source of [draftClient, statusClient]) {
+    assert.match(source, /VITE_NEON_HOMOLOGACAO_ENABLED\s*!==\s*'true'/);
+    assert.match(source, /vinculo\.data\?\.perfil !== 'admin'|perfil\.data\?\.perfil !== 'admin'/);
+  }
+});
