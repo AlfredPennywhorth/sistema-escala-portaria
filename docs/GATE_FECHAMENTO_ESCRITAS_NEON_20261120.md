@@ -39,3 +39,25 @@ Novo preflight reproduzível: `migration/neon/tests/06_write_surface_audit_reado
 Correção funcional isolada: `src/services/neon/restricoesService.ts` passou a respeitar limite superior `dataFim` em duas consultas por período sem excluir restrições recorrentes (data NULL com dia_semana presente); adicionada verificação de contrato em `tests/neon-contracts.test.mjs`. Atenção: o serviço legado Supabase ainda mantém o comportamento antigo, e a homologação por JWT dessa mudança funcional permanece pendente.
 
 Próximo gate exige planejar e revisar **todas** as RPCs administrativas de escrita, executar migração coordenada de privilégios em branch descartável, comprovar JWT real e concorrência; não retirar grants isoladamente.
+
+## Auditoria consolidada das sete RPCs — 21/11/2026
+
+Consulta **somente leitura**, reproduzível em `migration/neon/tests/11_write_surface_full_gate_readonly.sql`, executada na branch Neon descartável `br-holy-term-b6v6ofea`. Usa apenas catálogos de permissões e funções, sem acessar dados pessoais, sem alterar grants/DDL/DML:
+
+| Evidência | Resultado |
+| --- | ---: |
+| Tabelas auditadas `rodizios` / `rodizio_itens` | 2 |
+| Tabelas com DML direto para `authenticated` | **2** |
+| Tabelas sem RLS | 0 |
+| RPCs versionadas ausentes/sobrecarregadas | 0 |
+| RPCs versionadas sem EXECUTE `authenticated` | 0 |
+| RPCs versionadas expostas a `anonymous` | 0 |
+| RPCs versionadas ainda `SECURITY INVOKER` | **7** |
+| RPCs versionadas sem `search_path` fixo | 0 |
+| RPC legada sem OCC instalada | **1** |
+| RPC legada executável por `authenticated` | **sim** |
+| Gate `direct_dml_closed` / `legacy_authenticated_closed` | **false / false** |
+
+**Classificação:** bloqueio P0 de integridade concorrente antes de produção. A existência de RLS e os sete endpoints versionados **não eliminam** a possibilidade de um Admin contornar a revisão via DML direto ou RPC legada. O resultado agrega o estado atual, não autoriza executar SQL corretiva.
+
+A sequência de mudança continua exigindo proposta **coordenada e revisada** de funções, identidade/perfil, grants e testes JWT/OCC, no ambiente descartável somente mediante autorização específica. Não remover direitos de tabela sem simultaneamente resolver a dependência `SECURITY INVOKER`; não converter automaticamente para DEFINER sem auditoria de privilégios, search_path e verificação de usuário. Proteger em CI via `tests/neon-write-surface-full.test.mjs`. Uma checagem estática de consulta sem mutação **não equivale** a fechar o gate funcional.
