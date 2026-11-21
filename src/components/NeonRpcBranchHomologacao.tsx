@@ -216,6 +216,12 @@ export function NeonRpcBranchHomologacao() {
   async function executarTransicaoVersionada(
     operacao: 'publicar' | 'travar' | 'vazio' | 'negativa-publicar' | 'negativa-travar',
   ) {
+    // Fixtures SQL05 206 consumidas (travado, revisão 2). A proteção
+    // independe do botão: bloquear qualquer invocação futura dos positivos.
+    if (operacao === 'publicar' || operacao === 'travar') {
+      setMensagem('T01/T04 encerrados: fixture 206 já travada. Não repetir.');
+      return;
+    }
     const sessao = await perfilAtual();
     if (!sessao) return;
     const negativa = operacao === 'negativa-publicar' || operacao === 'negativa-travar';
@@ -380,16 +386,15 @@ export function NeonRpcBranchHomologacao() {
           onClick={() => void executar(() => executarProva(true))}>
           Testar negativa da RPC (Auxiliar ou Coordenadora)
         </button>
-        <button type="button" disabled={ocupado} className="w-full rounded-md border border-red-500 p-3 disabled:opacity-50"
-          onClick={() => void executar(() => executarProva(false))}>
-          Testar gravação na fixture descartável (Admin)
-        </button>
+        <p className="rounded-md border border-slate-300 bg-slate-100 p-3 text-sm text-slate-700" role="note">
+          Teste positivo legado da fixture 205 já consumido. Não repetir gravações.
+        </p>
         <div className="border-t pt-4 space-y-2">
           <h2 className="text-lg font-semibold">SQL 05 — transições com JWT real</h2>
           <p className="text-xs text-amber-900">
-            Apenas fixtures 206, 207 e 208, nunca produção. Execute as negativas
-            com Auxiliar/Coordenadora, para publicar e travar, antes dos positivos. Admin: publicar
-            somente uma vez e depois travar somente uma vez.
+            Testes positivos T01/T04 já concluídos: fixture 206 travada, revisão 2.
+            Não repetir. Permanecem disponíveis apenas as negativas de autorização
+            e o teste de recusa de escala vazia, sempre na branch descartável.
           </p>
           <button type="button" disabled={ocupado} className="w-full rounded-md border p-3 disabled:opacity-50"
             onClick={() => void executar(() => executarTransicaoVersionada('negativa-publicar'))}>
@@ -403,14 +408,12 @@ export function NeonRpcBranchHomologacao() {
             onClick={() => void executar(() => executarTransicaoVersionada('vazio'))}>
             T06 — Bloquear publicação de escala vazia (Admin)
           </button>
-          <button type="button" disabled={ocupado} className="w-full rounded-md border border-red-500 p-3 disabled:opacity-50"
-            onClick={() => void executar(() => executarTransicaoVersionada('publicar'))}>
-            T01 — Publicar fixture 206 uma única vez (Admin)
-          </button>
-          <button type="button" disabled={ocupado} className="w-full rounded-md border border-red-500 p-3 disabled:opacity-50"
-            onClick={() => void executar(() => executarTransicaoVersionada('travar'))}>
-            T04 — Travar fixture 206 uma única vez (Admin)
-          </button>
+          <p className="rounded-md border border-slate-300 bg-slate-100 p-3 text-sm text-slate-700" role="note">
+            T01 — Publicação da fixture 206: concluído. Botão removido para impedir repetição.
+          </p>
+          <p className="rounded-md border border-slate-300 bg-slate-100 p-3 text-sm text-slate-700" role="note">
+            T04 — Travamento da fixture 206: concluído. Botão removido para impedir repetição.
+          </p>
         </div>
         <button type="button" disabled={ocupado} className="w-full rounded-md border p-3 disabled:opacity-50"
           onClick={() => void executar(async () => {
