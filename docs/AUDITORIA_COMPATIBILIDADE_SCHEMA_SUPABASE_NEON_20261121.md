@@ -53,3 +53,15 @@ Arquivo `migration/neon/tests/09_schema_compat_preflight_readonly.sql` é **some
 | Gatilhos INSERT em `rodizio_itens` | 0 | 1 |
 
 Contagem nula de anomalias Neon **não significa** migração aprovada, pois apenas contém fixtures fictícias. O gate Auth/identidades, histórico preservado, backup restaurável e migração funcional continuam pendentes.
+
+## Preflight semântico de identidades — 21/11/2026
+
+Uma consulta adicional exclusivamente de leitura ao projeto de origem, reproduzível em `migration/neon/tests/10_duplicate_identity_semantics_readonly.sql`, mostrou:
+- 1 grupo de identidade com vínculo duplicado; 1 vínculo excedente;
+- **0** grupos com perfil conflitante;
+- **0** grupos com `auxiliar_id` não nulo conflitante;
+- **0** grupos misturando `auxiliar_id` nulo e não nulo.
+
+Logo, a duplicidade **não é semanticamente conflitante nesses campos**. Isso favorece uma deduplicação de vínculo **durante a migração**, mas não significa que foi autorizada/executada, nem comprova equivalência de toda a linha, autoria e histórico. Garantir um vínculo por novo `neon_auth."user"` depende de provisionar e verificar as identidades de destino e de preservar em registro privado o mapeamento de UUIDs de origem e destino. **Nenhuma conta/registro de origem foi alterado.**
+
+O SQL usa apenas agregados e o teste `tests/neon-identity-reconciliation.test.mjs` impede mutações acidentais no preflight. Não colocar IDs, e-mails ou tokens nos relatórios de PR. O backup restaurável, fluxo Neon completo e validação pós-importação permanecem pré-requisitos para produção.
