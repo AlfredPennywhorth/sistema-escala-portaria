@@ -252,33 +252,23 @@ test('SQL06 P01 consumed cannot execute again from HML screen', () => {
   assert.match(source, /P01 — Criação do rascunho único: concluída, revisão 0/);
 });
 
-test('SQL06 P07 Admin deletion only reaches exact fixture 211 after strict checks', () => {
+test('SQL06 P07 consumed cannot run from isolated HML screen', () => {
   const source = read('src/components/NeonRpcBranchHomologacao.tsx');
-  const start = source.indexOf('async function testarPositivaSql06P07()');
-  const end = source.indexOf('async function preflightSql06SomenteLeitura()', start);
-  assert.ok(start > 0 && end > start, 'P07 must be independent');
-  const block = source.slice(start, end);
-  assert.match(block, /sessao\.perfil !== 'admin'/);
-  assert.match(block, /000000000211/);
-  assert.match(block, /000000000311/);
-  assert.match(block, /TESTE SQL06 EXCLUSAO EXCLUSIVO/);
-  assert.match(block, /anterior\.data\.status !== 'rascunho'/);
-  assert.match(block, /anterior\.data\.travado !== false/);
-  assert.match(block, /String\(anterior\.data\.revisao\) !== '0'/);
-  assert.match(block, /itensAnteriores\.data\?\.length !== 1/);
-  assert.match(block, /47f6adaf-4fe4-4837-a84c-078ed6b41fed/);
-  assert.match(block, /p01\.data\?\.length !== 1/);
-  assert.match(block, /setP07Tentado\(true\)/);
-  assert.ok(block.indexOf('setP07Tentado(true)') <
-    block.indexOf("CLIENTE.rpc('excluir_rodizio_rascunho_versionado'"));
-  assert.match(block, /p_revisao_esperada: 0/);
-  assert.match(block, /resposta\.data === true/);
-  assert.match(block, /depois\.data\?\.length === 0/);
-  assert.match(block, /itensDepois\.data\?\.length === 0/);
-  assert.match(block, /p02Preservado && p05Preservado/);
-  assert.match(block, /P07 inconclusivo ou falhou; NÃO REPETIR/);
-  assert.doesNotMatch(block, /\.insert\(|\.update\(|\.delete\(|\.upsert\(/);
-  assert.match(source, /disabled=\{ocupado \|\| p07Tentado\}/);
-  assert.doesNotMatch(source, /onClick=\{\(\) => void executar\(testarPositivaSql06P01\)\}/);
-  assert.doesNotMatch(source, /onClick=\{\(\) => void executar\(testarPositivaSql06P05\)\}/);
+  assert.doesNotMatch(source, /async function testarPositivaSql06P07\(/);
+  assert.doesNotMatch(source, /onClick=\{\(\) => void executar\(testarPositivaSql06P07\)\}/);
+  assert.match(source, /P07 — Exclusão da fixture 211 e item 311: concluída/);
+  assert.match(source, /Ações destrutivas consumidas foram retiradas/);
+});
+
+test('SQL06 scope of coordinator stays explicit until authorized role design', () => {
+  const sql = read('migration/neon/06_remaining_admin_mutations_PROPOSAL.sql');
+  for (const f of ['criar_rodizio_rascunho_versionado',
+                   'atualizar_cabecalho_rascunho_versionado',
+                   'cancelar_rodizio_versionado',
+                   'excluir_rodizio_rascunho_versionado']) {
+    const blockStart = sql.indexOf('CREATE OR REPLACE FUNCTION public.' + f);
+    const blockEnd = sql.indexOf('$$;', blockStart);
+    assert.ok(blockStart >= 0 && blockEnd > blockStart, f);
+    assert.match(sql.slice(blockStart, blockEnd), /usuario_tem_perfil\('admin'\)/);
+  }
 });
