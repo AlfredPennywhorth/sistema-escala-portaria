@@ -32,7 +32,6 @@ export function NeonRpcBranchHomologacao() {
   const [resultado, setResultado] = useState('');
   const [ocupado, setOcupado] = useState(false);
   const [negativasSql06Interrompidas, setNegativasSql06Interrompidas] = useState(false);
-  const [positivaSql06Tentada, setPositivaSql06Tentada] = useState(false);
   const [p05Tentado, setP05Tentado] = useState(false);
 
   async function executar(acao: () => Promise<void>) {
@@ -129,80 +128,6 @@ export function NeonRpcBranchHomologacao() {
     setMensagem(negacaoPorAdmin
       ? 'Negativa SQL06 recusada pelo banco. Envie apenas o resumo de resultado.'
       : 'Teste não aprovado. Não execute outros testes. Conferir fixtures no banco.');
-  }
-
-
-  async function testarPositivaSql06P02() {
-    // Gate desta implantação: somente P02. NUNCA liberar P01/P05/P07
-    // enquanto o banco não reconciliar P02 e o CI do próximo gate.
-    if (positivaSql06Tentada) {
-      setMensagem('SQL06 P02 já tentado nesta sessão. Conferir banco antes de qualquer outra prova.');
-      return;
-    }
-    const sessao = await perfilAtual();
-    if (!sessao || sessao.perfil !== 'admin') {
-      setMensagem('Somente JWT Administrador pode iniciar SQL06 P02.');
-      return;
-    }
-    const id = '00000000-0000-4000-8000-000000000209';
-    const anterior = await CLIENTE.from('rodizios')
-      .select('id,titulo,status,travado,revisao,data_inicio,data_fim')
-      .eq('id', id).maybeSingle();
-    if (anterior.error || !anterior.data ||
-      anterior.data.titulo !== 'TESTE SQL06 EDICAO EXCLUSIVO' ||
-      anterior.data.status !== 'rascunho' ||
-      anterior.data.travado !== false ||
-      String(anterior.data.revisao) !== '0' ||
-      anterior.data.data_inicio !== '2027-01-10' ||
-      anterior.data.data_fim !== '2027-01-31') {
-      setMensagem('P02 bloqueado: cabeçalho da fixture 209 divergente ou já utilizado.');
-      return;
-    }
-    const itens = await CLIENTE.from('rodizio_itens')
-      .select('id,data,rodizio_id').eq('rodizio_id', id);
-    if (itens.error || itens.data?.length !== 1 ||
-      itens.data[0].id !== '00000000-0000-4000-8000-000000000309' ||
-      itens.data[0].data !== '2027-01-15') {
-      setMensagem('P02 bloqueado: item 309 ou sua data divergente. Nenhuma RPC enviada.');
-      return;
-    }
-
-    // Trava antes da chamada. Em erro de transporte, NÃO tentar novamente.
-    setPositivaSql06Tentada(true);
-    const resposta = await CLIENTE.rpc('atualizar_cabecalho_rascunho_versionado', {
-      p_rodizio_id: id,
-      p_revisao_esperada: 0,
-      p_titulo: 'TESTE SQL06 EDICAO EXCLUSIVO P02 APROVADO',
-      p_data_inicio: '2027-01-10',
-      p_data_fim: '2027-01-31',
-      p_observacoes: 'FICTICIO P02: JWT ADMIN; somente branch descartavel',
-    });
-    const posterior = await CLIENTE.from('rodizios')
-      .select('id,titulo,status,travado,revisao,data_inicio,data_fim')
-      .eq('id', id).maybeSingle();
-    const aprovado = !resposta.error && !posterior.error &&
-      String(resposta.data) === '1' &&
-      posterior.data?.titulo === 'TESTE SQL06 EDICAO EXCLUSIVO P02 APROVADO' &&
-      posterior.data?.status === 'rascunho' &&
-      posterior.data?.travado === false &&
-      String(posterior.data?.revisao) === '1' &&
-      posterior.data?.data_inicio === '2027-01-10' &&
-      posterior.data?.data_fim === '2027-01-31';
-    setResultado(JSON.stringify({
-      ambiente: 'br-holy-term-b6v6ofea',
-      cenario: 'P02',
-      perfil: sessao.perfil,
-      funcao: 'atualizar_cabecalho_rascunho_versionado',
-      situacao: aprovado ? 'P02 aprovado na interface; exigir SELECT independente'
-        : 'P02 inconclusivo ou falhou; NÃO REPETIR; exigir SELECT independente',
-      sqlstate: resposta.error?.code ?? null,
-      erroBanco: resposta.error?.message ?? null,
-      revisaoAntes: anterior.data.revisao,
-      revisaoDepois: posterior.data?.revisao ?? null,
-      tituloDepois: posterior.data?.titulo ?? null,
-      retorno: resposta.error ? null : resposta.data,
-    }, null, 2));
-    setMensagem('P02 encerrado nesta sessão. Envie somente o resultado; não repita e não execute outros positivos.');
   }
 
 
