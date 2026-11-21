@@ -31,6 +31,7 @@ export function NeonRpcBranchHomologacao() {
   const [mensagem, setMensagem] = useState('');
   const [resultado, setResultado] = useState('');
   const [ocupado, setOcupado] = useState(false);
+  const [negativasSql06Interrompidas, setNegativasSql06Interrompidas] = useState(false);
 
   async function executar(acao: () => Promise<void>) {
     setOcupado(true);
@@ -59,6 +60,73 @@ export function NeonRpcBranchHomologacao() {
       return null;
     }
     return { perfil: vinculo.data.perfil as Perfil, id: usuario.id };
+  }
+
+  async function testarNegativaSql06(
+    cenario: 'N01' | 'N02' | 'N03' | 'N04',
+  ) {
+    // Nenhum positivo Admin aqui. O teste é uma prova real de permissão
+    // JWT com conta sem perfil admin, exclusivamente na branch descartável.
+    // Se o servidor permitir qualquer RPC, interromper as demais provas.
+    if (negativasSql06Interrompidas) {
+      setMensagem('Provas SQL06 suspensas após divergência. Conferir banco.');
+      return;
+    }
+    const sessao = await perfilAtual();
+    if (!sessao) return;
+    if (sessao.perfil === 'admin') {
+      setMensagem('SQL06 N01–N04 exigem perfil Auxiliar ou Coordenadora, nunca Admin.');
+      return;
+    }
+    const testes = {
+      N01: {
+        funcao: 'criar_rodizio_rascunho_versionado',
+        args: { p_titulo: 'TESTE SQL06 NEGATIVA JWT FICTICIO',
+          p_data_inicio: '2027-04-01', p_data_fim: '2027-04-30',
+          p_observacoes: 'NEGATIVA JWT; nao deve criar nenhuma escala' },
+      },
+      N02: {
+        funcao: 'atualizar_cabecalho_rascunho_versionado',
+        args: { p_rodizio_id: '00000000-0000-4000-8000-000000000209',
+          p_revisao_esperada: 0,
+          p_titulo: 'TESTE SQL06 EDICAO INDEVIDA',
+          p_data_inicio: '2027-01-10', p_data_fim: '2027-01-31',
+          p_observacoes: 'NAO AUTORIZAR' },
+      },
+      N03: {
+        funcao: 'cancelar_rodizio_versionado',
+        args: { p_rodizio_id: '00000000-0000-4000-8000-000000000210',
+          p_revisao_esperada: 0 },
+      },
+      N04: {
+        funcao: 'excluir_rodizio_rascunho_versionado',
+        args: { p_rodizio_id: '00000000-0000-4000-8000-000000000211',
+          p_revisao_esperada: 0 },
+      },
+    } as const;
+    const { funcao, args } = testes[cenario];
+    const resposta = await CLIENTE.rpc(funcao, args);
+    const codigo = resposta.error?.code ?? null;
+    const negacaoPorAdmin = codigo === '42501' &&
+      (resposta.error?.message ?? '').includes('Somente administrador autenticado');
+    if (!negacaoPorAdmin) setNegativasSql06Interrompidas(true);
+    setResultado(JSON.stringify({
+      ambiente: 'br-holy-term-b6v6ofea',
+      fase: 'SQL06 negativa JWT real',
+      cenario,
+      perfil: sessao.perfil,
+      funcao,
+      aprovado: negacaoPorAdmin,
+      resultado: negacaoPorAdmin
+        ? 'APROVADO: banco negou a operação por falta de perfil Admin'
+        : 'BLOQUEIO: resultado inesperado; pare e peça conferência independente',
+      sqlstate: codigo,
+      detalhe: resposta.error?.message ?? 'ATENÇÃO: resposta sem erro!',
+      // Nunca registrar JWT, token de login ou dados pessoais.
+    }, null, 2));
+    setMensagem(negacaoPorAdmin
+      ? 'Negativa SQL06 recusada pelo banco. Envie apenas o resumo de resultado.'
+      : 'Teste não aprovado. Não execute outros testes. Conferir fixtures no banco.');
   }
 
   async function preflightSql06SomenteLeitura() {
@@ -378,6 +446,27 @@ export function NeonRpcBranchHomologacao() {
             onClick={() => void executar(preflightSql06SomenteLeitura)}>
             SQL 06 — conferir fixtures (somente leitura)
           </button>
+          <div className="space-y-2 border-t pt-3">
+            <h3 className="text-base font-semibold">SQL 06 — negativas por perfil</h3>
+            <p className="text-xs text-amber-900">
+              N01–N04: somente Auxiliar ou Coordenadora com JWT da branch descartável.
+              Nenhum resultado deve ser sucesso. Se houver divergência, os
+              demais testes ficam bloqueados. Não usar conta Administrador.
+            </p>
+            {([
+              ['N01', 'Negar criação de rascunho'],
+              ['N02', 'Negar edição da fixture 209'],
+              ['N03', 'Negar cancelamento da fixture 210'],
+              ['N04', 'Negar exclusão da fixture 211'],
+            ] as const).map(([cenario, descricao]) => (
+              <button type="button" key={cenario}
+                disabled={ocupado || negativasSql06Interrompidas}
+                className="w-full rounded-md border border-amber-600 p-3 disabled:opacity-50"
+                onClick={() => void executar(() => testarNegativaSql06(cenario))}>
+                {cenario} — {descricao} (Auxiliar/Coordenadora)
+              </button>
+            ))}
+          </div>
         </div>
         <button type="button" disabled={ocupado} className="w-full rounded-md border border-amber-500 p-3 disabled:opacity-50"
           onClick={() => void executar(() => executarProva(true))}>
