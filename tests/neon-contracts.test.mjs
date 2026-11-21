@@ -249,13 +249,40 @@ test('SQL06 Admin P02 is isolated, validates original fixture and blocks replay'
   assert.match(code, /String\(posterior\.data\?\.revisao\) === '1'/);
   assert.match(code, /P02 inconclusivo ou falhou; NÃO REPETIR/);
   assert.doesNotMatch(code, /\.insert\(|\.update\(|\.delete\(|\.upsert\(/);
-  assert.match(source, /disabled=\{ocupado \|\| positivaSql06Tentada\}/);
+  assert.doesNotMatch(source, /onClick=\{\(\) => void executar\(testarPositivaSql06P02\)\}/);
+  assert.match(source, /P02 — Edição da fixture 209: concluída, revisão 1/);
   assert.match(source, /P01 — Criar rascunho: bloqueado/);
-  assert.match(source, /P05 — Cancelar fixture 210: bloqueado/);
+  assert.match(source, /P05 — Cancelar fixture 210 uma única vez \(Admin\)/);
   assert.match(source, /P07 — Excluir fixture 211: bloqueado/);
   for (const method of [
     'criar_rodizio_rascunho_versionado',
     'cancelar_rodizio_versionado',
     'excluir_rodizio_rascunho_versionado',
   ]) assert.doesNotMatch(code, new RegExp("CLIENTE\\.rpc\\('"+method+"'"));
+});
+
+test('SQL06 P05 Admin cancelamento isolado, OCC e sem repetição', () => {
+  const source = read('src/components/NeonRpcBranchHomologacao.tsx');
+  const start = source.indexOf('async function testarPositivaSql06P05()');
+  const end = source.indexOf('async function preflightSql06SomenteLeitura()', start);
+  assert.ok(start > 0 && end > start);
+  const block = source.slice(start, end);
+  assert.match(block, /sessao\.perfil !== 'admin'/);
+  assert.match(block, /000000000210/);
+  assert.match(block, /000000000310/);
+  assert.match(block, /anterior\.data\.status !== 'publicado'/);
+  assert.match(block, /anterior\.data\.travado !== false/);
+  assert.match(block, /String\(anterior\.data\.revisao\) !== '0'/);
+  assert.match(block, /setP05Tentado\(true\)/);
+  assert.ok(block.indexOf('setP05Tentado(true)') <
+    block.indexOf("CLIENTE.rpc('cancelar_rodizio_versionado'"));
+  assert.match(block, /p_revisao_esperada: 0/);
+  assert.match(block, /posterior\.data\?\.status === 'cancelado'/);
+  assert.match(block, /String\(posterior\.data\?\.revisao\) === '1'/);
+  assert.match(block, /itensPosteriores\.data\?\.length === 1/);
+  assert.match(block, /P05 inconclusivo ou falhou; NÃO REPETIR/);
+  assert.doesNotMatch(block, /\.insert\(|\.update\(|\.delete\(|\.upsert\(/);
+  assert.match(source, /disabled=\{ocupado \|\| p05Tentado\}/);
+  assert.match(source, /P01 — Criar rascunho: bloqueado/);
+  assert.match(source, /P07 — Excluir fixture 211: bloqueado/);
 });
