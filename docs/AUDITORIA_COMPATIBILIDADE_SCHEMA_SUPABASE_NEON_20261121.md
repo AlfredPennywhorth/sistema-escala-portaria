@@ -38,3 +38,18 @@
 5. Quando houver backup **restaurado com êxito em ambiente isolado**, ensaiar cópia controlada; preservar origem e Neon main até Go/No-Go autorizado.
 
 **Estado:** NÃO está pronta a importação de dados ou identidades; PR #2 continua Draft. A meta de 29/11 não autoriza bypass de integridade, backup ou autenticação.
+
+## Preflight reproduzível — resultado independente (21/11)
+
+Arquivo `migration/neon/tests/09_schema_compat_preflight_readonly.sql` é **somente SELECT**, agregado e sem dados pessoais; protegido por `tests/neon-schema-compat.test.mjs` e CI. Execução real na origem e na branch descartável, sem qualquer alteração:
+
+| Métrica | Origem Supabase | Neon HML descartável |
+| --- | ---: | ---: |
+| Identidades com vínculos duplicados | 1 | 0 |
+| Registros de vínculo excedentes | 1 | 0 |
+| UNIQUE(user_id) como constraint | não | sim |
+| Índice parcial `idx_restricoes_ativa` | sim | não |
+| Itens de rodízios travados fora do intervalo | 8 | 0 (dados sintéticos) |
+| Gatilhos INSERT em `rodizio_itens` | 0 | 1 |
+
+Contagem nula de anomalias Neon **não significa** migração aprovada, pois apenas contém fixtures fictícias. O gate Auth/identidades, histórico preservado, backup restaurável e migração funcional continuam pendentes.
