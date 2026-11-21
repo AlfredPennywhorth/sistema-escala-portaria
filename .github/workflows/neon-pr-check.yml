@@ -6,6 +6,7 @@ on:
       - 'migration/neon/**'
       - 'tests/neon-contracts.test.mjs'
       - 'tests/neon-release-gates.test.mjs'
+      - 'tests/neon-data-inventory.test.mjs'
       - 'scripts/check-neon-release-gates.mjs'
       - 'package.json'
       - 'tsconfig*.json'
@@ -49,5 +50,7 @@ jobs:
         run: node --test tests/neon-contracts.test.mjs
       - name: Validate production Go/No-Go checks (offline)
         run: node --test tests/neon-release-gates.test.mjs
+      - name: Validate source/destination read-only inventory (offline)
+        run: node --test tests/neon-data-inventory.test.mjs
       - name: ESLint
         run: npm run lint
