@@ -5,6 +5,8 @@ on:
       - 'src/**'
       - 'migration/neon/**'
       - 'tests/neon-contracts.test.mjs'
+      - 'tests/neon-release-gates.test.mjs'
+      - 'scripts/check-neon-release-gates.mjs'
       - 'package.json'
       - 'tsconfig*.json'
       - '.github/workflows/neon-pr-check.yml'
@@ -45,5 +47,7 @@ jobs:
           CF_PAGES_BRANCH: chore/neon-migration-prep-20261115
       - name: Check Neon OCC and authorization contracts (static, offline)
         run: node --test tests/neon-contracts.test.mjs
+      - name: Validate production Go/No-Go checks (offline)
+        run: node --test tests/neon-release-gates.test.mjs
       - name: ESLint
         run: npm run lint
