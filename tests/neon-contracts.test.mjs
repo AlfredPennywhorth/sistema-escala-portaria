@@ -210,3 +210,23 @@ test('SQL05 one-time positive actions are unreachable after fixture 206 consumed
   assert.doesNotMatch(source, /onClick=\{\(\) => void executar\(\(\) => executarProva\(false\)\)\}/);
   assert.match(source, /Teste positivo legado da fixture 205 já consumido/);
 });
+
+test('SQL06 non-Admin probes require JWT and stop after unexpected results', () => {
+  const source = read('src/components/NeonRpcBranchHomologacao.tsx');
+  const start = source.indexOf('async function testarNegativaSql06(');
+  const end = source.indexOf('async function preflightSql06SomenteLeitura()', start);
+  assert.ok(start > 0 && end > start);
+  const section = source.slice(start, end);
+  assert.match(section, /const sessao = await perfilAtual\(\)/);
+  assert.match(section, /if \(sessao\.perfil === 'admin'\)/);
+  assert.match(section, /if \(!negacaoPorAdmin\) setNegativasSql06Interrompidas\(true\)/);
+  assert.match(section, /codigo === '42501'/);
+  assert.match(section, /Somente administrador autenticado/);
+  for (const name of [
+    'criar_rodizio_rascunho_versionado',
+    'atualizar_cabecalho_rascunho_versionado',
+    'cancelar_rodizio_versionado',
+    'excluir_rodizio_rascunho_versionado',
+  ]) assert.match(section, new RegExp(name));
+  assert.match(source, /disabled=\{ocupado \|\| negativasSql06Interrompidas\}/);
+});
