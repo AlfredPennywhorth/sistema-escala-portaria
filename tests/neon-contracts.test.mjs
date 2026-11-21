@@ -200,3 +200,13 @@ test('SQL06 UI preflight does not invoke mutations and preserves SQL05 fixtures'
   }
   assert.match(source, /SQL 06 — conferir fixtures \(somente leitura\)/);
 });
+
+test('SQL05 one-time positive actions are unreachable after fixture 206 consumed', () => {
+  const source = read('src/components/NeonRpcBranchHomologacao.tsx');
+  assert.match(source, /operacao === 'publicar' \|\| operacao === 'travar'/);
+  assert.match(source, /T01\/T04 encerrados: fixture 206 já travada/);
+  assert.doesNotMatch(source, /onClick=\{\(\) => void executar\(\(\) => executarTransicaoVersionada\('publicar'\)\)\}/);
+  assert.doesNotMatch(source, /onClick=\{\(\) => void executar\(\(\) => executarTransicaoVersionada\('travar'\)\)\}/);
+  assert.doesNotMatch(source, /onClick=\{\(\) => void executar\(\(\) => executarProva\(false\)\)\}/);
+  assert.match(source, /Teste positivo legado da fixture 205 já consumido/);
+});
