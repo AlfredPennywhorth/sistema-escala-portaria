@@ -1,0 +1,36 @@
+# Inventário mínimo de migração — Supabase → Neon (21/11/2026)
+
+## Estado
+**Origem Supabase: NÃO INVENTARIADA; backup restaurável: NÃO COMPROVADO.**
+Não executar cutover/merge/deploy a partir de CI verde ou de contagens artificiais da branch descartável.
+
+## Ferramenta preparada e validada
+`migration/neon/tests/08_source_destination_inventory_readonly.sql` contém **um SELECT**, sem alterações em tabelas, grants ou autenticação. É compatível com o modelo das cinco tabelas de negócio em `supabase/schema.sql`; não exporta registros ou PII. CI protege seu caráter exclusivamente de leitura via `tests/neon-data-inventory.test.mjs`.
+
+Inventário na **branch descartável do Neon**, executado por SELECT real em 21/11:
+- `auxiliares=2`; `restricoes_auxiliares=0`; `rodizios=10`; `rodizio_itens=9`; `usuarios_auxiliares=3`.
+- Estados: rascunho 5; publicado 2; travado 2; cancelado 1.
+- Perfis: admin 1; coordenadora 1; auxiliar 1. A promoção do segundo operador ainda não aparece.
+- Invariantes: zero intervalos invertidos, zero itens sem rodízio/auxiliar, zero restrições órfãs, zero itens fora do período, zero travados sem flag.
+- **Dados exclusivamente fictícios**; não representam contagens da origem e não demonstram migração real.
+
+## Próxima coleta indispensável — usuário com acesso ao Supabase
+1. Abrir o projeto **Supabase de origem**, no painel de banco de dados (**SQL Editor**), com acesso apropriado. Confirmar visualmente que é a origem do aplicativo, não banco Neon ou ambiente de testes.
+2. Copiar o SQL de `migration/neon/tests/08_source_destination_inventory_readonly.sql` e executar como **consulta somente leitura**.
+3. Guardar o resultado de `contagens`, `status_rodizios`, `perfis` e `inconsistencias`. Esses campos são agregados e não contêm dados de pessoas. Registrar data/hora, identificador do projeto de origem (sem chave/segredo) e tipo de banco.
+4. Em etapa separada, verificar backup **restaurável** de esquema, dados, histórico e vínculos de identidades. O inventário agregado não é backup. Confirmar snapshots/exportação e como restaurar numa instância isolada, sem alterar origem.
+5. Só então preparar ensaio de migração dos dados para branch Neon isolada, preservando UUIDs e vínculos, comparando contagens, chaves, restrições, datas, histórico travado e correspondência de usuários entre provedores de autenticação.
+6. **Não** enviar token JWT/OTP, API service role, string de conexão, senhas ou dumps com dados pessoais diretamente em comentários públicos de PR.
+
+## Critérios de aceite para avançar
+- Origem identificada e inventário obtido, com inexistência de inconsistências não explicadas.
+- Backup com teste de restauração comprovado, não somente arquivo exportado.
+- Identidade e mapeamento do segundo administrador verificáveis; não atualizar perfil no Neon main ou produção sem autorização separada.
+- Proposta de migração de esquema/dados revisada, ensaio isolado e rollback recuperável.
+- Bloqueios de DML direto e RPC legada fechados de forma **coordenada**; não revogar privilégios isoladamente enquanto funções são SECURITY INVOKER.
+- Aplicação funcional realmente conectada ao Neon na HML, não apenas a tela `?rpc-branch-test=1`.
+
+## Plano da meta 29/11
+A obtenção das contagens e do backup da origem é o próximo bloqueio do caminho crítico. Em paralelo, preparar integração funcional e migração segura em PR #2. Em 28/11 emitir GO apenas com evidências completas e aprovação específica. Se algum gate bloquear, manter a produção Supabase atual funcionando.
+
+Nenhuma instrução aqui autoriza alterações no Supabase original, Neon main, HML principal ou produção.
