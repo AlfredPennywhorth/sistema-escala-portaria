@@ -128,3 +128,11 @@ P05 foi homologado na branch descartável: fixture 210 está `cancelado`, revis�
 Pós-chamada: consultar novamente por título; exigir exatamente um registro, id retornado pela RPC igual ao id lido, estado `rascunho`, `travado=false`, revisão 0, datas corretas e nenhum item; resultado inconclusivo, inclusive timeout, **NÃO deve ser repetido**. A conclusão ainda depende de SELECT independente da branch. A checagem do título é apenas barreira de homologação e reconciliação: **não cria garantia de idempotência concorrente no banco**. Portanto, não executar P01 em duas sessões ou dispositivos e não reexecutar após refresh sem conferência. A interface continua isolada no host Cloudflare HML por flag e URL explícita; o banco alvo é fixado na branch descartável.
 
 **Gate de uso:** aguardar CI do código e confirmação visual de publicação. Nenhum positivo P01 foi executado nesta etapa. Não há modificações no Neon main, HML principal, Supabase origem ou produção.
+
+## P01 homologado — criação JWT Administrador (21/11/2026)
+
+Captura enviada pelo usuário confirmou o teste `P01`, perfil `admin`, função `criar_rodizio_rascunho_versionado`, `sqlstate=null`, `erroBanco=null`, `registrosEncontrados=1`, `estadoDepois=rascunho`, `revisaoDepois=0` e `itensDepois=0`. A interface indica operação encerrada e proíbe repetição.
+
+SELECT independente na branch **descartável** `br-holy-term-b6v6ofea` confirmou um único registro com marcador `TESTE SQL06 P01 CRIACAO JWT ADMIN UNICA 20261121`, UUID `47f6adaf-4fe4-4837-a84c-078ed6b41fed`, status `rascunho`, `travado=false`, revisão 0, período 2027-04-01 a 2027-04-30, 0 itens, observações fictícias previstas. Totais após a prova: **11 escalas, 10 itens**. Fixtures 209 (rascunho/rev1/1 item), 210 (cancelado/rev1/1 item) e 211 (rascunho/rev0/1 item) preservadas. **P01 homologado**. Não repetir P01, inclusive após reload ou em outro dispositivo.
+
+Próximo gate: retirar botão P01 da interface e preparar P07, com pré-checagem do estado/itens da fixture 211, confirmação de efeito restrito e reconciliação independente do banco. A exclusão ainda NÃO foi executada, e a ausência de idempotência transacional na função de criação permanece um risco de aplicação para uso real. DML direto e concorrência continuam pendentes; sem merge, sem alterações na HML principal ou produção.
