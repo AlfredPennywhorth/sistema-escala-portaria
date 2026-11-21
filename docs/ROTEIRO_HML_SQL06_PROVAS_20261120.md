@@ -78,3 +78,11 @@ Captura do usuário demonstra `cenario=N02`, perfil `auxiliar`, função `atuali
 SELECT independente posterior confirma fixture 209 intacta: título `TESTE SQL06 EDICAO EXCLUSIVO`, datas `2027-01-10` a `2027-01-31`, `rascunho`, `travado=false`, revisão `0`, observação fictícia original e **um item**. Fixtures 210 (publicado, revisão 0, um item) e 211 (rascunho, revisão 0, um item) também permanecem preservadas.
 
 **N02 aprovado, sem mutação indevida.** Próximo teste autorizado na sequência: somente N03 (negação de cancelamento da fixture 210), seguido de SELECT independente. Não executar N04 ou positivos Admin até reconciliar N03.
+
+## Evidência de campo N03 — Auxiliar, 21/11/2026
+
+Captura fornecida pelo usuário: `cenario=N03`, `perfil=auxiliar`, `funcao=cancelar_rodizio_versionado`, `aprovado=true`, `sqlstate=42501`, mensagem da RPC recusando autorização exclusiva de Administrador. **Resultado: N03 aprovado na interface.**
+
+Reconciliado por SELECT independente: fixture 210 (UUID terminado em `210`) permanece `TESTE SQL06 CANCELAMENTO EXCLUSIVO`, `publicado`, `travado=false`, `revisao=0`, datas `2027-02-01` a `2027-02-28`, com **1 item**. Banco preservado em **10 escalas e 10 itens**. **N03 homologado — nenhuma alteração indevida.**
+
+Próximo gate: N04 com JWT Auxiliar, **somente negativa de exclusão** da fixture nova 211; após resposta, SELECT independente deve comprovar permanência da 211 e item 311. Não executar positivos Admin nem repetir SQL05.
