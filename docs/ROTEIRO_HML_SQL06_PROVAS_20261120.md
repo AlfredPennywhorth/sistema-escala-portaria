@@ -38,3 +38,19 @@
 
 ## Critério para iniciar os testes positivos
 Requer autorização separada para a criação/alteração/cancelamento/exclusão de novas fixtures fictícias na **mesma branch descartável**; não autoriza qualquer intervenção no Neon main, HML principal ou produção. A execução será granular e interrompida na primeira divergência.
+
+## Execução controlada de preparação — 20/11/2026
+
+O usuário autorizou a continuidade dos ensaios na branch Neon descartável. CI do commit `84f72fb07b3cd21204a97b90dea58810b9178f7c` **aprovado** (`#44851827647`) após correção de TypeScript: botões T01/T04 bloqueados tornaram três testes de tipo inalcançáveis; os ramos antigos foram removidos.
+
+**Baseline anterior preservado:** 7 escalas e 7 itens, fixtures 202–208 sem reutilização. Antes do provisionamento, SELECT confirmou ausência dos UUIDs 209–211. Após o CI verde, foram inseridos em uma única transação, **apenas** em `blue-sky-02214231/br-holy-term-b6v6ofea/rodizio_portas`, três cabeçalhos e três itens sintéticos.
+
+| Fixture | Finalidade | Estado / revisão | Datas | Item | Porta |
+| --- | --- | --- | --- | --- | --- |
+| 209 | Edição SQL06 | rascunho / 0 | 2027-01-10 a 2027-01-31 | 309 | TESTE SQL06 EDITAR |
+| 210 | Cancelamento SQL06 | publicado / 0 | 2027-02-01 a 2027-02-28 | 310 | TESTE SQL06 CANCELAR |
+| 211 | Exclusão SQL06 | rascunho / 0 | 2027-03-01 a 2027-03-31 | 311 | TESTE SQL06 EXCLUIR |
+
+Cada item pertence ao rodízio de mesmo sufixo 2xx e tem `auxiliar_id=NULL`; dados não representam pessoas reais. SELECT independente confirmou os três títulos, estados, datas, revisões e itens após transação. Quantidade esperada após preparo: **10 escalas, 10 itens**. Nenhuma RPC SQL06 foi invocada; instalação SQL06 segue intacta; não houve alteração na HML principal, main Neon, Supabase origem ou produção.
+
+**Importante:** P01 (criação por RPC JWT) ainda necessita teste próprio, pois as três fixtures acima foram criadas por SQL de preparação, não pela RPC. P02/P05/P07 somente poderão ser considerados aprovados após execução **separada** com JWT Admin, conferência do SQLSTATE e reconciliação de cada fixture. Não repetir uma operação após timeout. A exclusão deve atingir exclusivamente 211 e 311; nenhuma outra fixture pode ser afetada. O bypass DML direto continua aberto.
