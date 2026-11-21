@@ -8,7 +8,8 @@
 - Segundo operador era perfil `coordenadora`; responsável decidiu conceder-lhe `admin`, **ainda sem comprovação de troca**. Não criar funções paralelas para Coordenadora.
 - Neon main ainda precisa receber dados reais; a aplicação operacional em `src/App.tsx` segue no cliente Supabase, não no Neon. A tela Neon isolada não é a aplicação migrada.
 - Há INSERT/UPDATE/DELETE direto para o papel `authenticated` e RPC legada acessível: as policies RLS são restritivas ao Admin, mas esse Admin ainda consegue contornar o controle de revisão. Fechar em migração coordenada sem revogar grants isoladamente de RPCs SECURITY INVOKER.
-- Inventário e backup restaurável da origem Supabase **não comprovados**.
+- Inventário real da origem Supabase **comprovado em 21/11** (9 auxiliares, 8 rodízios, 380 itens, 8 restrições, 4 vínculos associados a 3 identidades). **Backup restaurável ainda não comprovado**; procedimento em `docs/BACKUP_ORIGEM_SUPABASE_NO_COMPUTADOR_20261121.md`.
+- A origem contém 8 itens históricos de 04/07/2026 sob rodízio travado iniciado em 05/07/2026; preserve o histórico. Duplicidade de um vínculo Admin não conflita em perfil ou auxiliar, mas a nova FK e UNIQUE no Neon exigem reconciliação de Auth.
 
 ## Caminho crítico para o dia 29 — ordem de execução
 
@@ -43,3 +44,11 @@ Não incluir senhas, tokens OTP/JWT, connection strings, PII sensível ou dados 
 Executar manualmente apenas: segundo login Admin e um fluxo E2E representativo; uma prova de conflito OCC em fixture inédita isolada. Fazer verificações de grants, integridade, FK, contagem e backup por consultas automáticas e evidências técnicas. Não repetir P01, P02, P05, P07 nem testar Coordenadora com privilégios especiais que deixam de existir após promoção a Admin.
 
 **Critério de parada:** qualquer diferença entre origem e destino, ausência de backup restaurável, bypass de escrita, perda de histórico, erro no ciclo operacional, ou falta de autorização de produção implica NO-GO em 29/11.
+
+## Evidência atual de revisão — 21/11/2026 (Brasília)
+
+- CI do HEAD `128bf1945b16a26c67d2610af9eaeaf70c3881af`: GitHub Actions run **44944544243**, `completed/success`.
+- Codex respondeu em 21/11 à revisão `@codex review` do commit `544371355e`: **`Didn't find any major issues`** (issuecomment 7068530594, 17h08 BRT).
+- Codex respondeu também à revisão incremental do HEAD `128bf1945b`: **`Didn't find any major issues`** (issuecomment 7070703138, 20h11 BRT). Confirmar sempre o SHA ao interpretar o review; a aprovação de commit anterior não valida alterações posteriores.
+- CI e Codex sem achados críticos **não** liberam a produção, nem substituem revisão específica das mudanças de grants/RLS/RPC, ainda não feitas.
+- A migração de dados reais continua NO-GO até backup restaurável, mapa das 3 identidades, ordem de importação dos 7 rodízios travados, fechamento de bypass DML/RPC, homologação operacional Neon e aprovação explícita.
