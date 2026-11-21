@@ -551,6 +551,9 @@ export function NeonRpcBranchHomologacao() {
               Criação não idempotente: após qualquer tentativa, não repetir.
             </p>
             <p role="note" className="rounded-md bg-slate-100 p-3 text-xs">
+              P02 — Edição da fixture 209: concluída, revisão 1. Botão removido.
+            </p>
+            <p role="note" className="rounded-md bg-slate-100 p-3 text-xs">
               P05 — Cancelamento da fixture 210: concluído, revisão 1. Botão removido.
             </p>
             <button type="button" disabled={ocupado || p01Tentado}
