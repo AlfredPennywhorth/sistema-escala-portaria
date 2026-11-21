@@ -44,3 +44,7 @@ Tentativas estritamente de leitura de `list_tables(public)` e `execute_sql(SELEC
 O conector oferece `restore_project`, mas restaurar/reativar o projeto de origem é mudança operacional com impacto em disponibilidade e potencial custo; **não foi executada**. Antes, solicitar autorização explícita limitada a restaurar/retomar somente `pjjrsfnchpizlezrliyw`, sem alterações de tabelas, usuários ou configurações. Após estado `ACTIVE_HEALTHY`, executar exclusivamente `08_source_destination_inventory_readonly.sql`, inventário de auth apenas agregado e verificar backup restaurável por procedimento documentado.
 
 **Bloqueio crítico do Go/No-Go 29/11:** origem Supabase inativa; contagens, integridade real, mapeamento de identidades e backup ainda não comprovados.
+
+## Reativação autorizada — 21/11/2026
+
+O usuário autorizou explicitamente a reativação **exclusiva** de `pjjrsfnchpizlezrliyw` para inventário de **somente leitura**, sem mudar tabelas, usuários ou configurações. A ação `restore_project` retornou `success=true`. `get_project` logo após retornou `COMING_UP`, indicando inicialização em curso; **não equivale a ACTIVE_HEALTHY**, nem comprova ainda acesso aos dados. Nenhuma SQL mutante foi executada. A próxima ação, apenas quando o status estiver `ACTIVE_HEALTHY`, é executar o arquivo `08_source_destination_inventory_readonly.sql` para registrar contagens e integridade agregadas. A validação de backup restaurável continua separada.
