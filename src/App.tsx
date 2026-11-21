@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Layout } from './components/Layout';
 import { EscalaView } from './components/EscalaView';
 import { Configuracoes } from './components/Configuracoes';
@@ -8,17 +8,12 @@ import { AuxiliaresAdmin } from './components/AuxiliaresAdmin';
 import { ConfigCheck } from './components/ConfigCheck';
 import { LoginPage } from './components/LoginPage';
 import { useAuth } from './hooks/useAuth';
+import { NeonAuthHomologacao } from './components/NeonAuthHomologacao';
+import { NeonRpcBranchHomologacao } from './components/NeonRpcBranchHomologacao';
 
-export function App() {
+function AppPrincipal() {
   const { loading } = useAuth();
-  const [currentPage, setCurrentPage] = useState('escala');
-
-  useEffect(() => {
-    const hash = window.location.hash;
-    if (hash && hash.includes('type=recovery')) {
-      setCurrentPage('login');
-    }
-  }, []);
+  const [currentPage, setCurrentPage] = useState(() => window.location.hash.includes('type=recovery') ? 'login' : 'escala');
 
   if (loading) {
     return (
@@ -58,6 +53,28 @@ export function App() {
       <ConfigCheck />
     </>
   );
+}
+
+// Só habilita a tela isolada em build de homologação com configuração explícita.
+// Sem esta variável, o runtime Supabase original continua em uso.
+export function App() {
+  if (import.meta.env.VITE_NEON_HOMOLOGACAO_ENABLED === 'true') {
+    // A rota da RPC usa Auth/Data API da branch DESCARTAVEL, nunca a principal.
+    // Evita expor o piloto no dominio de producao mesmo com flag acidental.
+    // Cloudflare Pages gera hosts próprios para cada deployment preview,
+    // ex.: aff92e86.rodizio-portaria-neon-hml.pages.dev.
+    // Restringir ao projeto Neon HML e exigir opt-in explícito na URL.
+    // Nunca habilitar em rodizio-portaria.pages.dev ou em domínio externo.
+    const hostname = window.location.hostname.toLowerCase();
+    const hostnameHml = hostname === 'rodizio-portaria-neon-hml.pages.dev' ||
+      /^[a-z0-9-]+\.rodizio-portaria-neon-hml\.pages\.dev$/.test(hostname);
+    if (hostnameHml &&
+        new URLSearchParams(window.location.search).get('rpc-branch-test') === '1') {
+      return <NeonRpcBranchHomologacao />;
+    }
+    return <NeonAuthHomologacao />;
+  }
+  return <AppPrincipal />;
 }
 
 export default App;

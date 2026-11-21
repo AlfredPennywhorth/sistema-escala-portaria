@@ -1,0 +1,62 @@
+name: Neon Migration Branch Check
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'migration/neon/**'
+      - 'tests/neon-contracts.test.mjs'
+      - 'tests/neon-release-gates.test.mjs'
+      - 'tests/neon-data-inventory.test.mjs'
+      - 'tests/neon-schema-compat.test.mjs'
+      - 'tests/neon-identity-reconciliation.test.mjs'
+      - 'scripts/check-neon-release-gates.mjs'
+      - 'package.json'
+      - 'tsconfig*.json'
+      - '.github/workflows/neon-pr-check.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Typecheck and build (without production credentials)
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: https://example.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: test-public-key
+          VITE_NEON_AUTH_URL: https://example.neonauth.neon.tech/auth
+          VITE_NEON_DATA_API_URL: https://example.apirest.neon.tech/rest/v1
+      - name: Build isolated Neon authentication homologation screen
+        run: npm run build
+        env:
+          VITE_NEON_HOMOLOGACAO_ENABLED: 'true'
+          VITE_NEON_AUTH_URL: https://example.neonauth.neon.tech/auth
+          VITE_NEON_DATA_API_URL: https://example.apirest.neon.tech/rest/v1
+          VITE_SUPABASE_URL: https://example.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: test-public-key
+      - name: Cloudflare Pages isolated homologation build
+        run: npm run build:cloudflare-homologacao
+        env:
+          CF_PAGES: '1'
+          CF_PAGES_BRANCH: chore/neon-migration-prep-20261115
+      - name: Check Neon OCC and authorization contracts (static, offline)
+        run: node --test tests/neon-contracts.test.mjs
+      - name: Validate production Go/No-Go checks (offline)
+        run: node --test tests/neon-release-gates.test.mjs
+      - name: Validate source/destination read-only inventory (offline)
+        run: node --test tests/neon-data-inventory.test.mjs
+      - name: Validate schema compatibility preflight (offline)
+        run: node --test tests/neon-schema-compat.test.mjs
+      - name: Validate identity deduplication preflight (offline)
+        run: node --test tests/neon-identity-reconciliation.test.mjs
+      - name: ESLint
+        run: npm run lint
