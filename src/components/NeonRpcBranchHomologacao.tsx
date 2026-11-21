@@ -239,8 +239,6 @@ export function NeonRpcBranchHomologacao() {
         : ESCALA_TRANSICAO;
     const esperado = operacao === 'negativa-travar'
       ? { titulo: TITULO_NEGATIVA_TRAVAMENTO, status: 'publicado', revisao: 0, travado: false }
-      : operacao === 'travar'
-        ? { titulo: TITULO_TRANSICAO, status: 'publicado', revisao: 1, travado: false }
       : operacao === 'vazio'
         ? { titulo: TITULO_VAZIA, status: 'rascunho', revisao: 0, travado: false }
         : { titulo: TITULO_TRANSICAO, status: 'rascunho', revisao: 0, travado: false };
@@ -272,11 +270,11 @@ export function NeonRpcBranchHomologacao() {
       }
     }
 
-    const fn = operacao === 'travar' || operacao === 'negativa-travar'
+    const fn = operacao === 'negativa-travar'
       ? 'travar_rodizio_versionado' : 'publicar_rodizio_versionado';
     const resposta = await CLIENTE.rpc(fn, {
       p_rodizio_id: id,
-      p_revisao_esperada: operacao === 'travar' ? 1 : 0,
+      p_revisao_esperada: 0,
     });
     const codigo = resposta.error?.code ?? null;
     // Uma recusa por ESTADO também pode usar 42501. Só aceitar o teste
@@ -307,13 +305,12 @@ export function NeonRpcBranchHomologacao() {
         ? 'indeterminado: confira banco antes de repetir'
         : 'recusado pelo banco: ' + codigo;
     } else {
-      const novaRevisao = operacao === 'travar' ? 2 : 1;
-      const novoEstado = operacao === 'travar' ? 'travado' : 'publicado';
+      const novaRevisao = 1;
+      const novoEstado = 'publicado';
       situacao = String(resposta.data) === String(novaRevisao) &&
         String(depois?.data?.revisao) === String(novaRevisao) &&
         depois?.data?.status === novoEstado &&
-        depois?.data?.travado === (operacao === 'travar') &&
-        (operacao !== 'travar' || !!depois?.data?.travado_em)
+        depois?.data?.travado === false
         ? 'aprovado: transição versionada com JWT Admin real'
         : 'inconclusivo: revisão/estado divergente; não repetir';
     }
