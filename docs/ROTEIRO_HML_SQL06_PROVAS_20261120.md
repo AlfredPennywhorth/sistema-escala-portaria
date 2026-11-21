@@ -54,3 +54,11 @@ O usuário autorizou a continuidade dos ensaios na branch Neon descartável. CI 
 Cada item pertence ao rodízio de mesmo sufixo 2xx e tem `auxiliar_id=NULL`; dados não representam pessoas reais. SELECT independente confirmou os três títulos, estados, datas, revisões e itens após transação. Quantidade esperada após preparo: **10 escalas, 10 itens**. Nenhuma RPC SQL06 foi invocada; instalação SQL06 segue intacta; não houve alteração na HML principal, main Neon, Supabase origem ou produção.
 
 **Importante:** P01 (criação por RPC JWT) ainda necessita teste próprio, pois as três fixtures acima foram criadas por SQL de preparação, não pela RPC. P02/P05/P07 somente poderão ser considerados aprovados após execução **separada** com JWT Admin, conferência do SQLSTATE e reconciliação de cada fixture. Não repetir uma operação após timeout. A exclusão deve atingir exclusivamente 211 e 311; nenhuma outra fixture pode ser afetada. O bypass DML direto continua aberto.
+
+## Negativas JWT N01–N04 — interface preparada
+
+Adicionados à tela isolada `NeonRpcBranchHomologacao` quatro controles para JWT real Auxiliar/Coordenadora. Todos conferem previamente a sessão e recusam contas Admin. Cada teste invoca sua respectiva RPC SQL06 com parâmetros válidos, usando somente fixtures 209–211 para alterar/cancelar/excluir; criação negativa usa título fictício próprio. Resultado aprovado exige `SQLSTATE 42501` e mensagem `Somente administrador autenticado`. Qualquer resposta diferente, inclusive sucesso, interrompe os demais testes durante a sessão e obriga conferência independente do banco.
+
+**Não executados ainda:** estas provas dependem de publicação do build e autenticação com JWT real. A presença dos botões no site não equivale à validação. Não registrar JWT/OTP nos relatórios. A interface segue disponível somente no host de HML, rota com opt-in `?rpc-branch-test=1`, e usa CLIENTE de Auth/Data API fixo na branch descartável. Após cada negativa, reconciliar título/status/revisão da fixture alvo e verificar ausência de escala com título N01.
+
+**Importante:** os botões positivos SQL05 T01/T04 e o positivo legado 205 foram removidos; `#44851827647` confirmou build, testes e lint verdes após correção TS. A nova alteração N01–N04 precisa de CI próprio antes de qualquer teste de campo. Nenhuma mudança nos grants de tabelas foi aplicada.
