@@ -9,6 +9,7 @@ on:
       - 'tests/neon-data-inventory.test.mjs'
       - 'tests/neon-schema-compat.test.mjs'
       - 'tests/neon-identity-reconciliation.test.mjs'
+      - 'tests/neon-write-surface-full.test.mjs'
       - 'scripts/check-neon-release-gates.mjs'
       - 'package.json'
       - 'tsconfig*.json'
@@ -58,5 +59,7 @@ jobs:
         run: node --test tests/neon-schema-compat.test.mjs
       - name: Validate identity deduplication preflight (offline)
         run: node --test tests/neon-identity-reconciliation.test.mjs
+      - name: Validate complete write surface audit (offline)
+        run: node --test tests/neon-write-surface-full.test.mjs
       - name: ESLint
         run: npm run lint
