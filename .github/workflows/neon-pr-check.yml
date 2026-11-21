@@ -7,6 +7,7 @@ on:
       - 'tests/neon-contracts.test.mjs'
       - 'tests/neon-release-gates.test.mjs'
       - 'tests/neon-data-inventory.test.mjs'
+      - 'tests/neon-schema-compat.test.mjs'
       - 'scripts/check-neon-release-gates.mjs'
       - 'package.json'
       - 'tsconfig*.json'
@@ -52,5 +53,7 @@ jobs:
         run: node --test tests/neon-release-gates.test.mjs
       - name: Validate source/destination read-only inventory (offline)
         run: node --test tests/neon-data-inventory.test.mjs
+      - name: Validate schema compatibility preflight (offline)
+        run: node --test tests/neon-schema-compat.test.mjs
       - name: ESLint
         run: npm run lint
