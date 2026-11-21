@@ -245,27 +245,40 @@ test('SQL06 P05 consumed cannot execute again from HML screen', () => {
   assert.match(source, /P05 — Cancelamento da fixture 210: concluído, revisão 1/);
 });
 
-test('SQL06 Admin P01 requires verified prior P05, exclusive marker and no retry', () => {
+test('SQL06 P01 consumed cannot execute again from HML screen', () => {
   const source = read('src/components/NeonRpcBranchHomologacao.tsx');
-  const start = source.indexOf('async function testarPositivaSql06P01()');
+  assert.doesNotMatch(source, /async function testarPositivaSql06P01\(/);
+  assert.doesNotMatch(source, /onClick=\{\(\) => void executar\(testarPositivaSql06P01\)\}/);
+  assert.match(source, /P01 — Criação do rascunho único: concluída, revisão 0/);
+});
+
+test('SQL06 P07 Admin deletion only reaches exact fixture 211 after strict checks', () => {
+  const source = read('src/components/NeonRpcBranchHomologacao.tsx');
+  const start = source.indexOf('async function testarPositivaSql06P07()');
   const end = source.indexOf('async function preflightSql06SomenteLeitura()', start);
-  assert.ok(start > 0 && end > start, 'P01 function must be independent');
+  assert.ok(start > 0 && end > start, 'P07 must be independent');
   const block = source.slice(start, end);
   assert.match(block, /sessao\.perfil !== 'admin'/);
-  assert.match(block, /TESTE SQL06 P01 CRIACAO JWT ADMIN UNICA 20261121/);
-  assert.match(block, /\.eq\('titulo', titulo\)/);
-  assert.match(block, /anteriores\.data\.length !== 0/);
-  assert.match(block, /p05\.data\.status !== 'cancelado'/);
-  assert.match(block, /String\(p05\.data\.revisao\) !== '1'/);
-  assert.match(block, /setP01Tentado\(true\)/);
-  assert.ok(block.indexOf('setP01Tentado(true)') <
-    block.indexOf("CLIENTE.rpc('criar_rodizio_rascunho_versionado'"));
-  assert.match(block, /registrosEncontrados: conferidos\.error \? null : linhas\.length/);
-  assert.match(block, /linhas\.length === 1/);
-  assert.match(block, /resposta\.data === linha\.id/);
-  assert.match(block, /itens\?\.data\?\.length === 0/);
-  assert.match(block, /P01 inconclusivo ou falhou; NÃO REPETIR/);
+  assert.match(block, /000000000211/);
+  assert.match(block, /000000000311/);
+  assert.match(block, /TESTE SQL06 EXCLUSAO EXCLUSIVO/);
+  assert.match(block, /anterior\.data\.status !== 'rascunho'/);
+  assert.match(block, /anterior\.data\.travado !== false/);
+  assert.match(block, /String\(anterior\.data\.revisao\) !== '0'/);
+  assert.match(block, /itensAnteriores\.data\?\.length !== 1/);
+  assert.match(block, /47f6adaf-4fe4-4837-a84c-078ed6b41fed/);
+  assert.match(block, /p01\.data\?\.length !== 1/);
+  assert.match(block, /setP07Tentado\(true\)/);
+  assert.ok(block.indexOf('setP07Tentado(true)') <
+    block.indexOf("CLIENTE.rpc('excluir_rodizio_rascunho_versionado'"));
+  assert.match(block, /p_revisao_esperada: 0/);
+  assert.match(block, /resposta\.data === true/);
+  assert.match(block, /depois\.data\?\.length === 0/);
+  assert.match(block, /itensDepois\.data\?\.length === 0/);
+  assert.match(block, /p02Preservado && p05Preservado/);
+  assert.match(block, /P07 inconclusivo ou falhou; NÃO REPETIR/);
   assert.doesNotMatch(block, /\.insert\(|\.update\(|\.delete\(|\.upsert\(/);
-  assert.match(source, /disabled=\{ocupado \|\| p01Tentado\}/);
-  assert.match(source, /P07 — Excluir fixture 211: bloqueado/);
+  assert.match(source, /disabled=\{ocupado \|\| p07Tentado\}/);
+  assert.doesNotMatch(source, /onClick=\{\(\) => void executar\(testarPositivaSql06P01\)\}/);
+  assert.doesNotMatch(source, /onClick=\{\(\) => void executar\(testarPositivaSql06P05\)\}/);
 });
