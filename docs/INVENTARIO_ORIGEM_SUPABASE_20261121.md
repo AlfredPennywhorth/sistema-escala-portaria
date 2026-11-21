@@ -34,3 +34,13 @@ Inventário na **branch descartável do Neon**, executado por SELECT real em 21/
 A obtenção das contagens e do backup da origem é o próximo bloqueio do caminho crítico. Em paralelo, preparar integração funcional e migração segura em PR #2. Em 28/11 emitir GO apenas com evidências completas e aprovação específica. Se algum gate bloquear, manter a produção Supabase atual funcionando.
 
 Nenhuma instrução aqui autoriza alterações no Supabase original, Neon main, HML principal ou produção.
+
+## Confirmação da origem via conector Supabase (21/11/2026)
+
+A conexão Supabase foi realizada pelo responsável. O projeto **sistema-escala-portaria** foi identificado sem ambiguidade: ref `pjjrsfnchpizlezrliyw`, região `sa-east-1`, criado em 09/05/2026, estado **INACTIVE**. A ação independente `get_project` confirmou `INACTIVE`.
+
+Tentativas estritamente de leitura de `list_tables(public)` e `execute_sql(SELECT COUNT(...))` falharam com `Database is possibly not accessible at the moment`. **Nenhum dado foi alterado e nenhuma contagem da origem foi obtida.** Não afirmar que origem está vazia ou que backup está disponível.
+
+O conector oferece `restore_project`, mas restaurar/reativar o projeto de origem é mudança operacional com impacto em disponibilidade e potencial custo; **não foi executada**. Antes, solicitar autorização explícita limitada a restaurar/retomar somente `pjjrsfnchpizlezrliyw`, sem alterações de tabelas, usuários ou configurações. Após estado `ACTIVE_HEALTHY`, executar exclusivamente `08_source_destination_inventory_readonly.sql`, inventário de auth apenas agregado e verificar backup restaurável por procedimento documentado.
+
+**Bloqueio crítico do Go/No-Go 29/11:** origem Supabase inativa; contagens, integridade real, mapeamento de identidades e backup ainda não comprovados.
