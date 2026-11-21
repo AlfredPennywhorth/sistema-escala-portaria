@@ -65,3 +65,13 @@ Uma consulta adicional exclusivamente de leitura ao projeto de origem, reproduz�
 Logo, a duplicidade **não é semanticamente conflitante nesses campos**. Isso favorece uma deduplicação de vínculo **durante a migração**, mas não significa que foi autorizada/executada, nem comprova equivalência de toda a linha, autoria e histórico. Garantir um vínculo por novo `neon_auth."user"` depende de provisionar e verificar as identidades de destino e de preservar em registro privado o mapeamento de UUIDs de origem e destino. **Nenhuma conta/registro de origem foi alterado.**
 
 O SQL usa apenas agregados e o teste `tests/neon-identity-reconciliation.test.mjs` impede mutações acidentais no preflight. Não colocar IDs, e-mails ou tokens nos relatórios de PR. O backup restaurável, fluxo Neon completo e validação pós-importação permanecem pré-requisitos para produção.
+
+## Atenção à ordem de importação do histórico (21/11)
+
+Inspeção **somente leitura** de `pg_get_functiondef` na branch Neon descartável:
+- `bloquear_modificacao_itens_travados()` recusa INSERT/UPDATE de itens cujo cabeçalho já esteja travado e UPDATE/DELETE sobre histórico travado.
+- `bloquear_modificacao_rodizio_travado()` recusa UPDATE/DELETE se o estado anterior do cabeçalho tiver `travado=true`.
+
+**Implicação P0:** importar primeiro os 7 cabeçalhos históricos já travados e depois os 380 itens por lotes comuns deve falhar na inserção de itens desses rodízios. Isto é uma proteção correta em operação normal, não razão para desabilitar triggers na produção.
+
+**Desenho candidato apenas para revisão técnica:** em uma **instância isolada vazia**, dentro de procedimento de migração com integridade e reversão, carregar todos os cabeçalhos com estado transitório não travado, carregar todos os itens preservando IDs, datas e relações, validar contagens/FKs/amostras e só então finalizar status, `travado` e `travado_em` originais em uma etapa validada. Demonstrar que gatilhos de publicação e OCC não criam efeitos colaterais e que uma falha não deixa históricos destravados. Alternativa: mecanismo controlado de restauração com roles restritas e validação posterior. **Nenhuma dessas opções foi executada ou autorizada ainda**; revisão do Codex solicitada na PR #2. Nunca desabilitar triggers ou alterar histórico na origem para facilitar a importação.
