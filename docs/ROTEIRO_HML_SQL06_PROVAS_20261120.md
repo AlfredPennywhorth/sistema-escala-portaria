@@ -112,3 +112,11 @@ Nova versão da tela isolada disponibiliza **somente P05** como positivo: exige 
 P01 (criação não idempotente) e P07 (exclusão) permanecem sem botões. Nenhuma chamada positiva P05 foi executada na preparação. Exigir CI verde do commit correspondente, confirmar deploy HML por captura e realizar somente uma prova Admin; em resultado inesperado, parar e reconciliar, jamais tentar novamente automaticamente.
 
 A criação de um controle de UI **não** equivale a teste de autorização nem fechamento de bypass de DML direto; esses gates permanecem pendentes.
+
+## P05 homologado — JWT Administrador (21/11/2026)
+
+Captura fornecida pelo usuário com o cenário `P05`, perfil JWT `admin`, `cancelar_rodizio_versionado`, `sqlstate=null`, `erroBanco=null`, `revisaoAntes=0`, `revisaoDepois=1`, `estadoDepois=cancelado`, `itensDepois=1`, `retorno=1`. Interface informa encerramento da prova; **não repetir**.
+
+SELECT independente na branch descartável `br-holy-term-b6v6ofea` confirmou a fixture 210: título `TESTE SQL06 CANCELAMENTO EXCLUSIVO`, status `cancelado`, `travado=false`, revisão `1`, período 2027-02-01 a 2027-02-28, item UUID terminado em `310` preservado. Fixture 209 permanece rascunho revisão 1 com item 309 e título P02 aprovado; fixture 211 permanece rascunho revisão 0 com item 311. Totais preservados: 10 rodízios, 10 itens. **P05 homologado com reconciliação independente; nenhum erro observado.**
+
+Próximos gates: preparar P01 (criação não idempotente; identificação estável por marcador único e reconciliação após timeout) e P07 (exclusão exclusivamente da fixture nova 211; verificar cascata e demais registros), um por vez após CI e revisão. Não acionar P05 outra vez nem executar testes positivos não disponibilizados. O bypass de DML direto e segurança final permanecem pendentes. PR #2 Draft, nenhum merge ou alteração na produção.
