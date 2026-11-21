@@ -32,6 +32,7 @@ export function NeonRpcBranchHomologacao() {
   const [resultado, setResultado] = useState('');
   const [ocupado, setOcupado] = useState(false);
   const [negativasSql06Interrompidas, setNegativasSql06Interrompidas] = useState(false);
+  const [positivaSql06Tentada, setPositivaSql06Tentada] = useState(false);
 
   async function executar(acao: () => Promise<void>) {
     setOcupado(true);
@@ -127,6 +128,80 @@ export function NeonRpcBranchHomologacao() {
     setMensagem(negacaoPorAdmin
       ? 'Negativa SQL06 recusada pelo banco. Envie apenas o resumo de resultado.'
       : 'Teste não aprovado. Não execute outros testes. Conferir fixtures no banco.');
+  }
+
+
+  async function testarPositivaSql06P02() {
+    // Gate desta implantação: somente P02. NUNCA liberar P01/P05/P07
+    // enquanto o banco não reconciliar P02 e o CI do próximo gate.
+    if (positivaSql06Tentada) {
+      setMensagem('SQL06 P02 já tentado nesta sessão. Conferir banco antes de qualquer outra prova.');
+      return;
+    }
+    const sessao = await perfilAtual();
+    if (!sessao || sessao.perfil !== 'admin') {
+      setMensagem('Somente JWT Administrador pode iniciar SQL06 P02.');
+      return;
+    }
+    const id = '00000000-0000-4000-8000-000000000209';
+    const anterior = await CLIENTE.from('rodizios')
+      .select('id,titulo,status,travado,revisao,data_inicio,data_fim')
+      .eq('id', id).maybeSingle();
+    if (anterior.error || !anterior.data ||
+      anterior.data.titulo !== 'TESTE SQL06 EDICAO EXCLUSIVO' ||
+      anterior.data.status !== 'rascunho' ||
+      anterior.data.travado !== false ||
+      String(anterior.data.revisao) !== '0' ||
+      anterior.data.data_inicio !== '2027-01-10' ||
+      anterior.data.data_fim !== '2027-01-31') {
+      setMensagem('P02 bloqueado: cabeçalho da fixture 209 divergente ou já utilizado.');
+      return;
+    }
+    const itens = await CLIENTE.from('rodizio_itens')
+      .select('id,data,rodizio_id').eq('rodizio_id', id);
+    if (itens.error || itens.data?.length !== 1 ||
+      itens.data[0].id !== '00000000-0000-4000-8000-000000000309' ||
+      itens.data[0].data !== '2027-01-15') {
+      setMensagem('P02 bloqueado: item 309 ou sua data divergente. Nenhuma RPC enviada.');
+      return;
+    }
+
+    // Trava antes da chamada. Em erro de transporte, NÃO tentar novamente.
+    setPositivaSql06Tentada(true);
+    const resposta = await CLIENTE.rpc('atualizar_cabecalho_rascunho_versionado', {
+      p_rodizio_id: id,
+      p_revisao_esperada: 0,
+      p_titulo: 'TESTE SQL06 EDICAO EXCLUSIVO P02 APROVADO',
+      p_data_inicio: '2027-01-10',
+      p_data_fim: '2027-01-31',
+      p_observacoes: 'FICTICIO P02: JWT ADMIN; somente branch descartavel',
+    });
+    const posterior = await CLIENTE.from('rodizios')
+      .select('id,titulo,status,travado,revisao,data_inicio,data_fim')
+      .eq('id', id).maybeSingle();
+    const aprovado = !resposta.error && !posterior.error &&
+      String(resposta.data) === '1' &&
+      posterior.data?.titulo === 'TESTE SQL06 EDICAO EXCLUSIVO P02 APROVADO' &&
+      posterior.data?.status === 'rascunho' &&
+      posterior.data?.travado === false &&
+      String(posterior.data?.revisao) === '1' &&
+      posterior.data?.data_inicio === '2027-01-10' &&
+      posterior.data?.data_fim === '2027-01-31';
+    setResultado(JSON.stringify({
+      ambiente: 'br-holy-term-b6v6ofea',
+      cenario: 'P02',
+      perfil: sessao.perfil,
+      funcao: 'atualizar_cabecalho_rascunho_versionado',
+      situacao: aprovado ? 'P02 aprovado na interface; exigir SELECT independente'
+        : 'P02 inconclusivo ou falhou; NÃO REPETIR; exigir SELECT independente',
+      sqlstate: resposta.error?.code ?? null,
+      erroBanco: resposta.error?.message ?? null,
+      revisaoAntes: anterior.data.revisao,
+      revisaoDepois: posterior.data?.revisao ?? null,
+      tituloDepois: posterior.data?.titulo ?? null,
+      retorno: resposta.error ? null : resposta.data,
+    }, null, 2));
+    setMensagem('P02 encerrado nesta sessão. Envie somente o resultado; não repita e não execute outros positivos.');
   }
 
   async function preflightSql06SomenteLeitura() {
@@ -437,9 +512,9 @@ export function NeonRpcBranchHomologacao() {
         <div className="border-t pt-4 space-y-2">
           <h2 className="text-lg font-semibold">SQL 06 — pré-homologação</h2>
           <p className="text-sm text-amber-900">
-            Apenas consulta das fixtures 206, 207 e 208. As quatro funções SQL 06
-            foram instaladas, mas testes de mutação exigem outro gate. Não criar,
-            editar, cancelar ou excluir escalas nesta etapa.
+            Consulta das fixtures 206, 207 e 208 permanece somente leitura.
+            Testes positivos SQL06 seguem gate sequencial separado: P02 na fixture 209,
+            com JWT Administrador; demais operações continuam bloqueadas.
           </p>
           <button type="button" disabled={ocupado}
             className="w-full rounded-md border border-blue-600 p-3 disabled:opacity-50"
@@ -466,6 +541,28 @@ export function NeonRpcBranchHomologacao() {
                 {cenario} — {descricao} (Auxiliar/Coordenadora)
               </button>
             ))}
+          </div>
+          <div className="space-y-2 border-t pt-3">
+            <h3 className="text-base font-semibold">SQL 06 — positivos JWT Administrador</h3>
+            <p className="text-xs text-amber-900">
+              Gate sequencial: apenas P02 está liberado nesta versão. Execute uma única vez
+              com Administrador, somente na fixture 209 da branch descartável.
+              Após qualquer tentativa, não repita: a reconciliação independente é obrigatória.
+            </p>
+            <button type="button" disabled={ocupado || positivaSql06Tentada}
+              className="w-full rounded-md border border-red-600 p-3 disabled:opacity-50"
+              onClick={() => void executar(testarPositivaSql06P02)}>
+              P02 — Editar cabeçalho da fixture 209 uma única vez (Admin)
+            </button>
+            <p className="rounded-md bg-slate-100 p-3 text-xs">
+              P01 — Criar rascunho: bloqueado (criação não idempotente).
+            </p>
+            <p className="rounded-md bg-slate-100 p-3 text-xs">
+              P05 — Cancelar fixture 210: bloqueado até a conferência P02.
+            </p>
+            <p className="rounded-md bg-slate-100 p-3 text-xs">
+              P07 — Excluir fixture 211: bloqueado; requer conferência e gate de exclusão específico.
+            </p>
           </div>
         </div>
         <button type="button" disabled={ocupado} className="w-full rounded-md border border-amber-500 p-3 disabled:opacity-50"
