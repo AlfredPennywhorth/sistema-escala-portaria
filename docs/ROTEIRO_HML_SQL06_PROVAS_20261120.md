@@ -86,3 +86,11 @@ Captura fornecida pelo usuário: `cenario=N03`, `perfil=auxiliar`, `funcao=cance
 Reconciliado por SELECT independente: fixture 210 (UUID terminado em `210`) permanece `TESTE SQL06 CANCELAMENTO EXCLUSIVO`, `publicado`, `travado=false`, `revisao=0`, datas `2027-02-01` a `2027-02-28`, com **1 item**. Banco preservado em **10 escalas e 10 itens**. **N03 homologado — nenhuma alteração indevida.**
 
 Próximo gate: N04 com JWT Auxiliar, **somente negativa de exclusão** da fixture nova 211; após resposta, SELECT independente deve comprovar permanência da 211 e item 311. Não executar positivos Admin nem repetir SQL05.
+
+## Evidência de campo N04 — Auxiliar, 21/11/2026
+
+Captura do usuário: JWT com `perfil=auxiliar` na branch `br-holy-term-b6v6ofea`, cenário `N04`, função `excluir_rodizio_rascunho_versionado`, `aprovado=true`, `sqlstate=42501` e recusa do banco por exigir Administrador.
+
+SELECT independente após tentativa: fixture `00000000-0000-4000-8000-000000000211` preservada, título `TESTE SQL06 EXCLUSAO EXCLUSIVO`, estado `rascunho`, `travado=false`, `revisao=0`, período 2027-03-01 a 2027-03-31. Item `00000000-0000-4000-8000-000000000311` presente e vinculado à 211. Totais preservados: **10 escalas, 10 itens**.
+
+**Gate negativas SQL06 Auxiliar N01–N04 encerrado com 4/4 testes aprovados na interface e SELECT independente confirmatório.** Não generalizar para Coordenadora ou usuário não autenticado; ambos ainda pendentes. Próximo gate: planejar positivos com JWT Administrador, estado inicial e controles de idempotência/concorrência; executar somente de forma granular e em fixture sintética, jamais em 202–208. Nenhuma alteração na produção, Neon main ou HML principal.
