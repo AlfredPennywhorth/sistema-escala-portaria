@@ -62,3 +62,11 @@ Adicionados à tela isolada `NeonRpcBranchHomologacao` quatro controles para JWT
 **Não executados ainda:** estas provas dependem de publicação do build e autenticação com JWT real. A presença dos botões no site não equivale à validação. Não registrar JWT/OTP nos relatórios. A interface segue disponível somente no host de HML, rota com opt-in `?rpc-branch-test=1`, e usa CLIENTE de Auth/Data API fixo na branch descartável. Após cada negativa, reconciliar título/status/revisão da fixture alvo e verificar ausência de escala com título N01.
 
 **Importante:** os botões positivos SQL05 T01/T04 e o positivo legado 205 foram removidos; `#44851827647` confirmou build, testes e lint verdes após correção TS. A nova alteração N01–N04 precisa de CI próprio antes de qualquer teste de campo. Nenhuma mudança nos grants de tabelas foi aplicada.
+
+## Evidência de campo N01 — Auxiliar, 21/11/2026
+
+Capturas do usuário demonstram sessão JWT válida com perfil `auxiliar` e chamada real à RPC `criar_rodizio_rascunho_versionado` na branch descartável `br-holy-term-b6v6ofea`. A interface exibiu `cenario=N01`, `aprovado=true`, `SQLSTATE=42501` e erro de permissão `Somente administrador autenticado...`. Resultado: **N01 aprovado — recusa por perfil**.
+
+Reconciliado por SELECT independente após a prova: **10 escalas, 10 itens**, **zero** escalas com título `TESTE SQL06 NEGATIVA JWT FICTICIO`; fixture **209** permanece `TESTE SQL06 EDICAO EXCLUSIVO`, `rascunho`, `travado=false`, `revisao=0`, datas 2027-01-10 a 2027-01-31. Nenhuma mutação indevida identificada.
+
+**Próximo gate:** somente N02 com Auxiliar, depois SELECT independente da 209; N03 e N04 não executar ainda. Nenhuma alteração na HML principal, Neon main ou produção.
