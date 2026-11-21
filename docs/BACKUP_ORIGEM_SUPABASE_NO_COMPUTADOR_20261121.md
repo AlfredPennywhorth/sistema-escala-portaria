@@ -44,3 +44,12 @@ Armazene arquivo e hash em local privado criptografado. **Não enviar os dumps p
 
 ## Quando o computador estiver disponível
 Retomar a partir da verificação de `supabase --version` e de `Docker Desktop`. Acompanhar os três arquivos, seus tamanhos/hashes e um teste de restauração isolado. Registrar **somente metadados não sensíveis** na PR #2. Nenhum backup foi criado nesta sessão.
+
+## Escopo de Storage e Edge Functions verificado em 21/11/2026
+
+Inventário **somente leitura** no projeto Supabase original `pjjrsfnchpizlezrliyw`:
+- `storage.buckets`: **0**; `storage.objects`: **0** (não há objetos de Storage identificados para exportar).
+- Edge Functions listadas via API do projeto: **0**.
+- `auth.users`: **3 identidades**. Os dumps de negócio não substituem o plano de provisionamento e teste dessas identidades no Neon Auth.
+
+A ausência de objetos Storage e de Edge Functions reduz o escopo identificado do backup, mas **não prova** a cobertura de todos os serviços, segredos, configurações ou eventuais sistemas externos. O backup de esquema+dados+papéis e a restauração isolada continuam obrigatórios.
