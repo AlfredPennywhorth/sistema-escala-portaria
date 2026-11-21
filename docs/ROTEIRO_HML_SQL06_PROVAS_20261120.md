@@ -102,3 +102,13 @@ Implementado na tela isolada `NeonRpcBranchHomologacao.tsx` botão **P02 — Edi
 **NÃO executar P02 até confirmação de CI e deploy**. Nesta entrega, P01 (criação), P05 (cancelamento) e P07 (exclusão) estão visíveis porém deliberadamente **sem botões executáveis**, aguardando novos gates. As negativas N01–N04 por Auxiliar já foram homologadas e reconciliadas. Nenhuma RPC SQL06 positiva foi executada nesta rodada. A estratégia não resolve o bypass de DML direto nem elimina a necessidade de verificar idempotência para P01.
 
 Recomenda-se um SELECT independente sobre as fixtures 202–211 antes/depois da primeira prova positiva e paralisar imediatamente se títulos, quantidades, revisão ou itens não conferirem.
+
+## Gate P05 preparado — cancelamento com JWT Admin (21/11/2026)
+
+P02 confirmado por SELECT independente: fixture `209` com título `TESTE SQL06 EDICAO EXCLUSIVO P02 APROVADO`, rascunho, não travada, revisão 1, item `309` preservado. O botão P02 foi removido da tela de homologação para impedir nova execução.
+
+Nova versão da tela isolada disponibiliza **somente P05** como positivo: exige JWT `admin`; antes de invocar `cancelar_rodizio_versionado(uuid,bigint)`, exige fixture `210`, título `TESTE SQL06 CANCELAMENTO EXCLUSIVO`, estado `publicado`, `travado=false`, revisão `0`, datas `2027-02-01` a `2027-02-28` e item `310` em `2027-02-15`. Emite uma única RPC com `p_revisao_esperada=0` e bloqueia nova tentativa nesta sessão mesmo diante de erro de transporte. Valida o estado esperado `cancelado`, revisão `1`, item `310` e demais campos intactos; conclusão depende de SELECT independente. Após mudança de estado/revisão, um reload da tela também bloqueia a repetição pelo preflight.
+
+P01 (criação não idempotente) e P07 (exclusão) permanecem sem botões. Nenhuma chamada positiva P05 foi executada na preparação. Exigir CI verde do commit correspondente, confirmar deploy HML por captura e realizar somente uma prova Admin; em resultado inesperado, parar e reconciliar, jamais tentar novamente automaticamente.
+
+A criação de um controle de UI **não** equivale a teste de autorização nem fechamento de bypass de DML direto; esses gates permanecem pendentes.
