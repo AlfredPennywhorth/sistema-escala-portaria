@@ -66,3 +66,11 @@ Contagens confirmadas **na origem**, não na branch Neon descartável:
 **Diferença Neon main:** último inventário da main Neon teve 0 auxiliares, rodízios, itens e vínculos. Os 10 rodízios/9 itens do Neon descartável são fixtures sintéticas, **não são os dados da origem**.
 
 **Bloqueios atualizados para 29/11:** obter backup/restauração testados; revisar duplicidade de `usuarios_auxiliares` sem expor identidade; preservar 8 itens históricos fora do período; mapear corretamente as 3 identidades Auth antes de migração; concluir integração do app operacional ao Neon e fechar DML/RPC legadas. Nenhuma alteração executada nos dados de origem.
+
+## Comparação estrutural pré-migração (21/11/2026)
+
+Consultado `information_schema.columns` em Supabase origem `pjjrsfnchpizlezrliyw` e Neon branch descartável `br-holy-term-b6v6ofea`, apenas SELECT. As cinco tabelas de negócio totalizam **38 colunas de origem** e **39 no destino de teste**; única coluna adicional no Neon: `rodizios.revisao` para OCC. Nenhuma coluna da origem ausente no Neon. Não foram detectadas diferenças de tipo SQL ou nulidade nas 38 colunas comuns.
+
+Este exame é estrutural e parcial: não substitui comparação de defaults, CHECKs, chaves únicas, políticas RLS, gatilhos, funções, índices, permissões ou teste de migração de dados. A coluna extra `revisao` exige regra explícita de inicialização para rodízios existentes e preservação de histórico.
+
+Backup para computador documentado em `docs/BACKUP_ORIGEM_SUPABASE_NO_COMPUTADOR_20261121.md`, conforme comandos do Supabase CLI; nenhum dump/restauração executado nesta sessão.
