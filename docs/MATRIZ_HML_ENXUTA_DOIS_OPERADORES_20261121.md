@@ -32,3 +32,13 @@ O usuário informa que apenas dois operadores geram rodízios no sistema: **Admi
 
 ## Gate de mudança de permissão
 Caso Coordenadora precise **salvar** rodízios, formular matriz separada e mínima de criação/edição/publicação/travamento/cancelamento/exclusão; aprovar expressamente o escopo antes de alterar RLS, RPC ou código. Fazer somente testes críticos por operação de risco distinto, sem cenários duplicados. Sem alterações no Neon main, HML principal, Supabase origem ou produção; PR #2 permanece Draft até decisão.
+
+## Decisão posterior do responsável — dois usuários Administradores
+
+O responsável definiu que concederá perfil `admin` à pessoa anteriormente vinculada como `coordenadora`. **Esta é uma decisão prevista, ainda não aplicada por este trabalho**. Após a alteração validada, os dois operadores utilizarão as mesmas RPCs existentes, sem criar permissões paralelas para `coordenadora`.
+
+**Homologação mínima restante:** (1) confirmar por leitura que há dois vínculos de perfil `admin` no ambiente autorizado e autenticar a segunda conta para verificar o JWT `admin`; (2) executar apenas uma prova de conflito de revisão em fixture sintética separada, com reconciliação independente; (3) verificar tecnicamente privilégios DML direto, RPCs legadas, proteção do histórico, dados reais e migração de produção. Não repetir os positivos P01/P02/P05/P07 já homologados.
+
+**Ressalva:** mudar para `admin` amplia também outras capacidades administrativas. A alteração de perfil deve ser feita conscientemente no ambiente pretendido e não deve ser promovida à produção automaticamente. Não atualizar a conta por SQL nesta etapa; o usuário afirmou que realizará a atribuição.
+
+O conjunto anterior de testes da Coordenadora com perfil próprio fica dispensado **somente se** ela efetivamente passar a ter JWT `admin`. Antes da troca, as RLS e RPCs atuais continuam proibindo que o perfil `coordenadora` grave rodízios.
