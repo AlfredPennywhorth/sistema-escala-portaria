@@ -70,3 +70,11 @@ Capturas do usuário demonstram sessão JWT válida com perfil `auxiliar` e cham
 Reconciliado por SELECT independente após a prova: **10 escalas, 10 itens**, **zero** escalas com título `TESTE SQL06 NEGATIVA JWT FICTICIO`; fixture **209** permanece `TESTE SQL06 EDICAO EXCLUSIVO`, `rascunho`, `travado=false`, `revisao=0`, datas 2027-01-10 a 2027-01-31. Nenhuma mutação indevida identificada.
 
 **Próximo gate:** somente N02 com Auxiliar, depois SELECT independente da 209; N03 e N04 não executar ainda. Nenhuma alteração na HML principal, Neon main ou produção.
+
+## Evidência de campo N02 — Auxiliar, 21/11/2026
+
+Captura do usuário demonstra `cenario=N02`, perfil `auxiliar`, função `atualizar_cabecalho_rascunho_versionado`, `aprovado=true`, `sqlstate=42501` e recusa explícita de autorização administrativa pela RPC na branch descartável `br-holy-term-b6v6ofea`.
+
+SELECT independente posterior confirma fixture 209 intacta: título `TESTE SQL06 EDICAO EXCLUSIVO`, datas `2027-01-10` a `2027-01-31`, `rascunho`, `travado=false`, revisão `0`, observação fictícia original e **um item**. Fixtures 210 (publicado, revisão 0, um item) e 211 (rascunho, revisão 0, um item) também permanecem preservadas.
+
+**N02 aprovado, sem mutação indevida.** Próximo teste autorizado na sequência: somente N03 (negação de cancelamento da fixture 210), seguido de SELECT independente. Não executar N04 ou positivos Admin até reconciliar N03.
