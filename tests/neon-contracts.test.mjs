@@ -231,34 +231,11 @@ test('SQL06 non-Admin probes require JWT and stop after unexpected results', () 
   assert.match(source, /disabled=\{ocupado \|\| negativasSql06Interrompidas\}/);
 });
 
-test('SQL06 Admin P02 is isolated, validates original fixture and blocks replay', () => {
+test('SQL06 P02 consumed cannot execute again from isolated HML screen', () => {
   const source = read('src/components/NeonRpcBranchHomologacao.tsx');
-  const start = source.indexOf('async function testarPositivaSql06P02()');
-  const end = source.indexOf('async function preflightSql06SomenteLeitura()', start);
-  assert.ok(start > 0 && end > start);
-  const code = source.slice(start, end);
-  assert.match(code, /sessao\.perfil !== 'admin'/);
-  assert.match(code, /000000000209/);
-  assert.match(code, /000000000309/);
-  assert.match(code, /String\(anterior\.data\.revisao\) !== '0'/);
-  assert.match(code, /anterior\.data\.status !== 'rascunho'/);
-  assert.match(code, /setPositivaSql06Tentada\(true\)/);
-  assert.ok(code.indexOf('setPositivaSql06Tentada(true)') <
-    code.indexOf("CLIENTE.rpc('atualizar_cabecalho_rascunho_versionado'"));
-  assert.match(code, /p_revisao_esperada: 0/);
-  assert.match(code, /String\(posterior\.data\?\.revisao\) === '1'/);
-  assert.match(code, /P02 inconclusivo ou falhou; NÃO REPETIR/);
-  assert.doesNotMatch(code, /\.insert\(|\.update\(|\.delete\(|\.upsert\(/);
+  assert.doesNotMatch(source, /async function testarPositivaSql06P02\(/);
   assert.doesNotMatch(source, /onClick=\{\(\) => void executar\(testarPositivaSql06P02\)\}/);
   assert.match(source, /P02 — Edição da fixture 209: concluída, revisão 1/);
-  assert.match(source, /P01 — Criar rascunho: bloqueado/);
-  assert.match(source, /P05 — Cancelar fixture 210 uma única vez \(Admin\)/);
-  assert.match(source, /P07 — Excluir fixture 211: bloqueado/);
-  for (const method of [
-    'criar_rodizio_rascunho_versionado',
-    'cancelar_rodizio_versionado',
-    'excluir_rodizio_rascunho_versionado',
-  ]) assert.doesNotMatch(code, new RegExp("CLIENTE\\.rpc\\('"+method+"'"));
 });
 
 test('SQL06 P05 Admin cancelamento isolado, OCC e sem repetição', () => {
