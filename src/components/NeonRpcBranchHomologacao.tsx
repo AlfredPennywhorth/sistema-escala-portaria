@@ -32,7 +32,7 @@ export function NeonRpcBranchHomologacao() {
   const [resultado, setResultado] = useState('');
   const [ocupado, setOcupado] = useState(false);
   const [negativasSql06Interrompidas, setNegativasSql06Interrompidas] = useState(false);
-  const [p01Tentado, setP01Tentado] = useState(false);
+  const [p07Tentado, setP07Tentado] = useState(false);
 
   async function executar(acao: () => Promise<void>) {
     setOcupado(true);
@@ -131,77 +131,106 @@ export function NeonRpcBranchHomologacao() {
   }
 
 
-  async function testarPositivaSql06P01() {
-    // Esta RPC NÃO oferece idempotência transacional. O título constante
-    // serve para reconciliação, não como garantia de exclusividade no banco.
-    if (p01Tentado) {
-      setMensagem('P01 já tentado nesta sessão. Não repetir; conferir o banco.');
+  async function testarPositivaSql06P07() {
+    // Exclusão IRREVERSÍVEL apenas na branch descartável. Nunca repetir após
+    // timeout. P01 e demais fixtures ficam fora do escopo desta RPC.
+    if (p07Tentado) {
+      setMensagem('P07 já tentado nesta sessão. Não repetir; conferir o banco.');
       return;
     }
     const sessao = await perfilAtual();
     if (!sessao || sessao.perfil !== 'admin') {
-      setMensagem('Somente JWT Administrador pode iniciar SQL06 P01.');
+      setMensagem('Somente JWT Administrador pode iniciar SQL06 P07.');
       return;
     }
-    const titulo = 'TESTE SQL06 P01 CRIACAO JWT ADMIN UNICA 20261121';
-    const anteriores = await CLIENTE.from('rodizios')
-      .select('id,titulo,status,revisao')
-      .eq('titulo', titulo);
-    if (anteriores.error || !anteriores.data || anteriores.data.length !== 0) {
-      setMensagem('P01 bloqueado: título já existente ou leitura indeterminada. Conferir banco.');
+    const id = '00000000-0000-4000-8000-000000000211';
+    const itemId = '00000000-0000-4000-8000-000000000311';
+    const tituloCriacaoP01 = 'TESTE SQL06 P01 CRIACAO JWT ADMIN UNICA 20261121';
+    const p01 = await CLIENTE.from('rodizios')
+      .select('id,status,travado,revisao').eq('titulo', tituloCriacaoP01);
+    if (p01.error || p01.data?.length !== 1 ||
+      p01.data[0].id !== '47f6adaf-4fe4-4837-a84c-078ed6b41fed' ||
+      p01.data[0].status !== 'rascunho' || p01.data[0].travado !== false ||
+      String(p01.data[0].revisao) !== '0') {
+      setMensagem('P07 bloqueado: P01 não está íntegro ou contém duplicidade.');
       return;
     }
-    // Garante que o gate P05 anterior foi consumido e reconciliado.
-    const p05 = await CLIENTE.from('rodizios')
-      .select('id,status,travado,revisao')
-      .eq('id', '00000000-0000-4000-8000-000000000210').maybeSingle();
-    if (p05.error || !p05.data || p05.data.status !== 'cancelado' ||
-      p05.data.travado !== false || String(p05.data.revisao) !== '1') {
-      setMensagem('P01 bloqueado: P05 ainda não confirmado no banco.');
+    const anterior = await CLIENTE.from('rodizios')
+      .select('id,titulo,status,travado,revisao,data_inicio,data_fim')
+      .eq('id', id).maybeSingle();
+    if (anterior.error || !anterior.data ||
+      anterior.data.id !== id ||
+      anterior.data.titulo !== 'TESTE SQL06 EXCLUSAO EXCLUSIVO' ||
+      anterior.data.status !== 'rascunho' ||
+      anterior.data.travado !== false ||
+      String(anterior.data.revisao) !== '0' ||
+      anterior.data.data_inicio !== '2027-03-01' ||
+      anterior.data.data_fim !== '2027-03-31') {
+      setMensagem('P07 bloqueado: fixture 211 divergente ou já utilizada.');
       return;
     }
-    // Bloquear antes da chamada, também se a rede cair e a resposta for incerta.
-    setP01Tentado(true);
-    const resposta = await CLIENTE.rpc('criar_rodizio_rascunho_versionado', {
-      p_titulo: titulo,
-      p_data_inicio: '2027-04-01',
-      p_data_fim: '2027-04-30',
-      p_observacoes: 'FICTICIO SQL06 P01; JWT Admin; branch descartavel',
+    const itensAnteriores = await CLIENTE.from('rodizio_itens')
+      .select('id,rodizio_id,data,porta,periodo,auxiliar_id')
+      .eq('rodizio_id', id);
+    if (itensAnteriores.error || itensAnteriores.data?.length !== 1 ||
+      itensAnteriores.data[0].id !== itemId ||
+      itensAnteriores.data[0].rodizio_id !== id ||
+      itensAnteriores.data[0].data !== '2027-03-15' ||
+      itensAnteriores.data[0].porta !== 'TESTE SQL06 EXCLUIR' ||
+      itensAnteriores.data[0].periodo !== 'HML' ||
+      itensAnteriores.data[0].auxiliar_id !== null) {
+      setMensagem('P07 bloqueado: dependências da fixture 211 divergentes.');
+      return;
+    }
+    // Bloqueio antes da chamada, inclusive diante de erro de transporte.
+    setP07Tentado(true);
+    const resposta = await CLIENTE.rpc('excluir_rodizio_rascunho_versionado', {
+      p_rodizio_id: id,
+      p_revisao_esperada: 0,
     });
-    const conferidos = await CLIENTE.from('rodizios')
-      .select('id,titulo,status,travado,revisao,data_inicio,data_fim,observacoes')
-      .eq('titulo', titulo);
-    const linhas = conferidos.data ?? [];
-    const linha = linhas.length === 1 ? linhas[0] : null;
-    const itens = linha
-      ? await CLIENTE.from('rodizio_itens').select('id').eq('rodizio_id', linha.id)
-      : null;
-    const aprovado = !resposta.error && !conferidos.error && !itens?.error &&
-      linhas.length === 1 && !!linha &&
-      resposta.data === linha.id &&
-      linha.status === 'rascunho' &&
-      linha.travado === false &&
-      String(linha.revisao) === '0' &&
-      linha.data_inicio === '2027-04-01' &&
-      linha.data_fim === '2027-04-30' &&
-      itens?.data?.length === 0;
+    const depois = await CLIENTE.from('rodizios')
+      .select('id').eq('id', id);
+    const itensDepois = await CLIENTE.from('rodizio_itens')
+      .select('id').eq('rodizio_id', id);
+    const p01Depois = await CLIENTE.from('rodizios')
+      .select('id').eq('id', p01.data[0].id);
+    const preservados = await CLIENTE.from('rodizios')
+      .select('id,status,revisao').in('id', [
+        '00000000-0000-4000-8000-000000000209',
+        '00000000-0000-4000-8000-000000000210',
+      ]);
+    const p02Preservado = preservados.data?.some(r =>
+      r.id === '00000000-0000-4000-8000-000000000209' &&
+      r.status === 'rascunho' && String(r.revisao) === '1');
+    const p05Preservado = preservados.data?.some(r =>
+      r.id === '00000000-0000-4000-8000-000000000210' &&
+      r.status === 'cancelado' && String(r.revisao) === '1');
+    const aprovado = !resposta.error && resposta.data === true &&
+      !depois.error && depois.data?.length === 0 &&
+      !itensDepois.error && itensDepois.data?.length === 0 &&
+      !p01Depois.error && p01Depois.data?.length === 1 &&
+      p01Depois.data[0].id === p01.data[0].id &&
+      !preservados.error && preservados.data?.length === 2 &&
+      p02Preservado && p05Preservado;
     setResultado(JSON.stringify({
       ambiente: 'br-holy-term-b6v6ofea',
-      cenario: 'P01',
+      cenario: 'P07',
       perfil: sessao.perfil,
-      funcao: 'criar_rodizio_rascunho_versionado',
-      situacao: aprovado ? 'P01 aprovado na interface; exigir SELECT independente'
-        : 'P01 inconclusivo ou falhou; NÃO REPETIR; reconciliar por título no banco',
+      funcao: 'excluir_rodizio_rascunho_versionado',
+      situacao: aprovado ? 'P07 aprovado na interface; exigir SELECT independente'
+        : 'P07 inconclusivo ou falhou; NÃO REPETIR; exigir SELECT independente',
       sqlstate: resposta.error?.code ?? null,
       erroBanco: resposta.error?.message ?? null,
-      tituloMarcador: titulo,
-      idRetornado: resposta.error ? null : resposta.data,
-      registrosEncontrados: conferidos.error ? null : linhas.length,
-      estadoDepois: linha?.status ?? null,
-      revisaoDepois: linha?.revisao ?? null,
-      itensDepois: itens?.data?.length ?? null,
+      idExcluido: id,
+      itemExcluido: itemId,
+      retorno: resposta.error ? null : resposta.data,
+      registros211Depois: depois.error ? null : depois.data?.length,
+      itens311Depois: itensDepois.error ? null : itensDepois.data?.length,
+      p01Preservado: !p01Depois.error && p01Depois.data?.length === 1,
+      p02Preservado: !!p02Preservado,
+      p05Preservado: !!p05Preservado,
     }, null, 2));
-    setMensagem('P01 encerrado nesta sessão. Não repetir, mesmo em falha de rede; envie apenas o resultado.');
+    setMensagem('P07 encerrado nesta sessão; não repetir. Envie o resultado para reconciliação independente.');
   }
 
   async function preflightSql06SomenteLeitura() {
@@ -546,9 +575,9 @@ export function NeonRpcBranchHomologacao() {
           <div className="space-y-2 border-t pt-3">
             <h3 className="text-base font-semibold">SQL 06 — positivos JWT Administrador</h3>
             <p className="text-xs text-amber-900">
-              Gate sequencial: P02 e P05 concluídos e conferidos no banco.
-              Somente P01 está liberado para JWT Administrador na branch descartável.
-              Criação não idempotente: após qualquer tentativa, não repetir.
+              Gate sequencial: P02, P05 e P01 concluídos e conferidos.
+              Somente P07 está disponível para Admin, sobre fixture 211 fictícia.
+              Exclusão irreversível na branch descartável: após qualquer tentativa, não repetir.
             </p>
             <p role="note" className="rounded-md bg-slate-100 p-3 text-xs">
               P02 — Edição da fixture 209: concluída, revisão 1. Botão removido.
@@ -556,14 +585,14 @@ export function NeonRpcBranchHomologacao() {
             <p role="note" className="rounded-md bg-slate-100 p-3 text-xs">
               P05 — Cancelamento da fixture 210: concluído, revisão 1. Botão removido.
             </p>
-            <button type="button" disabled={ocupado || p01Tentado}
-              className="w-full rounded-md border border-red-600 p-3 disabled:opacity-50"
-              onClick={() => void executar(testarPositivaSql06P01)}>
-              P01 — Criar rascunho uma única vez (Admin)
-            </button>
-            <p className="rounded-md bg-slate-100 p-3 text-xs">
-              P07 — Excluir fixture 211: bloqueado; requer conferência e gate de exclusão específico.
+            <p role="note" className="rounded-md bg-slate-100 p-3 text-xs">
+              P01 — Criação do rascunho único: concluída, revisão 0. Botão removido.
             </p>
+            <button type="button" disabled={ocupado || p07Tentado}
+              className="w-full rounded-md border border-red-600 p-3 disabled:opacity-50"
+              onClick={() => void executar(testarPositivaSql06P07)}>
+              P07 — Excluir fixture fictícia 211 uma única vez (Admin)
+            </button>
           </div>
         </div>
         <button type="button" disabled={ocupado} className="w-full rounded-md border border-amber-500 p-3 disabled:opacity-50"
