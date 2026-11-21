@@ -94,3 +94,11 @@ Captura do usuário: JWT com `perfil=auxiliar` na branch `br-holy-term-b6v6ofea`
 SELECT independente após tentativa: fixture `00000000-0000-4000-8000-000000000211` preservada, título `TESTE SQL06 EXCLUSAO EXCLUSIVO`, estado `rascunho`, `travado=false`, `revisao=0`, período 2027-03-01 a 2027-03-31. Item `00000000-0000-4000-8000-000000000311` presente e vinculado à 211. Totais preservados: **10 escalas, 10 itens**.
 
 **Gate negativas SQL06 Auxiliar N01–N04 encerrado com 4/4 testes aprovados na interface e SELECT independente confirmatório.** Não generalizar para Coordenadora ou usuário não autenticado; ambos ainda pendentes. Próximo gate: planejar positivos com JWT Administrador, estado inicial e controles de idempotência/concorrência; executar somente de forma granular e em fixture sintética, jamais em 202–208. Nenhuma alteração na produção, Neon main ou HML principal.
+
+## Gate P02 preparado — JWT Administrador (21/11/2026)
+
+Implementado na tela isolada `NeonRpcBranchHomologacao.tsx` botão **P02 — Editar cabeçalho da fixture 209 uma única vez (Admin)**. Antes de qualquer RPC, exige JWT Admin, fixture 209 com ID exato, título `TESTE SQL06 EDICAO EXCLUSIVO`, `rascunho`, `travado=false`, revisão 0, datas 2027-01-10 e 2027-01-31, e exatamente um item 309 em 2027-01-15. A RPC envia `p_revisao_esperada=0`, mantém datas e altera só título/observações; sucesso esperado: revisão 1, título `TESTE SQL06 EDICAO EXCLUSIVO P02 APROVADO`, status rascunho. A interface se bloqueia após qualquer tentativa, inclusive erro de transporte; a execução definitiva exige SELECT independente.
+
+**NÃO executar P02 até confirmação de CI e deploy**. Nesta entrega, P01 (criação), P05 (cancelamento) e P07 (exclusão) estão visíveis porém deliberadamente **sem botões executáveis**, aguardando novos gates. As negativas N01–N04 por Auxiliar já foram homologadas e reconciliadas. Nenhuma RPC SQL06 positiva foi executada nesta rodada. A estratégia não resolve o bypass de DML direto nem elimina a necessidade de verificar idempotência para P01.
+
+Recomenda-se um SELECT independente sobre as fixtures 202–211 antes/depois da primeira prova positiva e paralisar imediatamente se títulos, quantidades, revisão ou itens não conferirem.
