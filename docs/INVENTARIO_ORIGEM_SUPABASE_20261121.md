@@ -48,3 +48,21 @@ O conector oferece `restore_project`, mas restaurar/reativar o projeto de origem
 ## Reativação autorizada — 21/11/2026
 
 O usuário autorizou explicitamente a reativação **exclusiva** de `pjjrsfnchpizlezrliyw` para inventário de **somente leitura**, sem mudar tabelas, usuários ou configurações. A ação `restore_project` retornou `success=true`. `get_project` logo após retornou `COMING_UP`, indicando inicialização em curso; **não equivale a ACTIVE_HEALTHY**, nem comprova ainda acesso aos dados. Nenhuma SQL mutante foi executada. A próxima ação, apenas quando o status estiver `ACTIVE_HEALTHY`, é executar o arquivo `08_source_destination_inventory_readonly.sql` para registrar contagens e integridade agregadas. A validação de backup restaurável continua separada.
+
+## Inventário real após reativação — 21/11/2026
+
+A origem Supabase `pjjrsfnchpizlezrliyw` passou a `ACTIVE_HEALTHY`. Foi executado o **SELECT somente leitura** de `migration/neon/tests/08_source_destination_inventory_readonly.sql`, sem escrever dados.
+
+Contagens confirmadas **na origem**, não na branch Neon descartável:
+- `auxiliares=9`, `restricoes_auxiliares=8`, `rodizios=8`, `rodizio_itens=380`, `usuarios_auxiliares=4`.
+- Estados dos 8 rodízios: `travado=7`, `publicado=1`, `rascunho=0`, `cancelado=0`.
+- Vínculos: `admin=4`, `coordenadora=0`, `auxiliar=0`. Auth.users: **3 identidades distintas**; zero identidades sem vínculo e zero vínculos órfãos, porém há **um usuário com dois vínculos** administrativos (duplicidade de associação), que precisa ser reconciliado antes de provisionar usuários Neon.
+- Cinco tabelas de negócio com RLS habilitada.
+- Integridade: sem itens órfãos, sem referências a auxiliares inexistentes, sem restrições órfãs, sem rodízios com período invertido e sem rodízios travados com flag incoerente.
+- Exceção histórica: **8 itens em 04/07/2026** ligados a um único rodízio **travado** cujo período declarado vai de **05/07/2026 a 31/07/2026**. UUID do cabeçalho `af183833-3012-4d33-849a-0dd2fdae07e4`. **Não alterar nem eliminar histórico:** resolver contratualmente se é divergência legítima/erro de cabeçalho antes de migração definitiva.
+- Todos os 8 rodízios têm itens.
+- Inventário não equivale a backup restaurável. Captura do dashboard Supabase indica `Last Backup: No backups`; **ainda não há backup restaurável comprovado**.
+
+**Diferença Neon main:** último inventário da main Neon teve 0 auxiliares, rodízios, itens e vínculos. Os 10 rodízios/9 itens do Neon descartável são fixtures sintéticas, **não são os dados da origem**.
+
+**Bloqueios atualizados para 29/11:** obter backup/restauração testados; revisar duplicidade de `usuarios_auxiliares` sem expor identidade; preservar 8 itens históricos fora do período; mapear corretamente as 3 identidades Auth antes de migração; concluir integração do app operacional ao Neon e fechar DML/RPC legadas. Nenhuma alteração executada nos dados de origem.
