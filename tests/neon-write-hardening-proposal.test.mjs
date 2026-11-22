@@ -36,3 +36,22 @@ test('all seven versioned RPCs are converted and guarded, legacy RPC disabled',(
  assert.match(uncommented,/FROM PUBLIC, anonymous, authenticated/);
  assert.match(uncommented,/TO authenticated/);
 });
+
+test('postflight rejects residual inherited or column-level write privileges for both roles',()=>{
+ const postflight=uncommented.split('DO $postflight$')[1];
+ assert.ok(postflight,'postflight required');
+ for(const role of ['authenticated','anonymous']){
+   for(const op of ['INSERT','UPDATE']){
+     assert.match(postflight,new RegExp("has_any_column_privilege\\('"+role+"',c\\.oid,'"+op+"'\\)"),role+' '+op);
+   }
+   for(const op of ['INSERT','UPDATE','DELETE']){
+     assert.match(postflight,new RegExp("has_table_privilege\\('"+role+"',c\\.oid,'"+op+"'\\)"),role+' table '+op);
+   }
+ }
+ assert.match(postflight,/IF v_n <> 0 THEN\s*RAISE EXCEPTION 'DML direto ainda acessivel, rollback'/);
+});
+test('missing proconfig must fail closed before and after SECURITY DEFINER',()=>{
+ const nullSafe=/\(p\.proconfig @> ARRAY\['search_path=""'\]::text\[\]\) IS NOT TRUE/g;
+ assert.equal((uncommented.match(nullSafe)||[]).length,2,'both preflight and postflight must reject NULL proconfig');
+ assert.doesNotMatch(uncommented,/OR NOT \(p\.proconfig @>/,'NULL bypass via NOT must not reappear');
+});
