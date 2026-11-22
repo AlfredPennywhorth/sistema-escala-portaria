@@ -10,6 +10,7 @@ on:
       - 'tests/neon-schema-compat.test.mjs'
       - 'tests/neon-identity-reconciliation.test.mjs'
       - 'tests/neon-write-surface-full.test.mjs'
+      - 'tests/neon-write-hardening-proposal.test.mjs'
       - 'scripts/check-neon-release-gates.mjs'
       - 'package.json'
       - 'tsconfig*.json'
@@ -61,5 +62,7 @@ jobs:
         run: node --test tests/neon-identity-reconciliation.test.mjs
       - name: Validate complete write surface audit (offline)
         run: node --test tests/neon-write-surface-full.test.mjs
+      - name: Validate write hardening proposal (offline, never executes SQL)
+        run: node --test tests/neon-write-hardening-proposal.test.mjs
       - name: ESLint
         run: npm run lint
