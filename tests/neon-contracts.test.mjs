@@ -272,3 +272,22 @@ test('SQL06 scope of coordinator stays explicit until authorized role design', (
     assert.match(sql.slice(blockStart, blockEnd), /usuario_tem_perfil\('admin'\)/);
   }
 });
+
+
+test('Neon operational preview is read-only and isolated from production', () => {
+  const app = read('src/App.tsx');
+  const source = read('src/components/NeonOperacionalHml.tsx');
+  assert.match(app, /hostnameHml &&[\s\S]*?operacional-neon/);
+  assert.match(app, /return <NeonOperacionalHml \/>/);
+  assert.match(app, /return <AppPrincipal \/>/);
+  assert.match(source, /obterUsuarioAtual\(/);
+  assert.match(source, /obterPerfilUsuarioAtual\(/);
+  assert.match(source, /vinculo\.data\?\.perfil !== 'admin'/);
+  assert.match(source, /listarRodiziosAdministrativosNeonHml\(/);
+  assert.match(source, /obterRodizioComItensNeonHml\(/);
+  assert.match(source, /listarAuxiliares\(true\)/);
+  assert.match(source, /listarRestricoesAtivas\(/);
+  assert.doesNotMatch(source, /from ['"]\.\.\/services\/rodiziosService|from ['"]\.\.\/lib\/supabase/);
+  assert.doesNotMatch(source, /\.(?:insert|update|delete|upsert|rpc)\s*\(/);
+  assert.doesNotMatch(source, /<button[^>]*>\s*(?:Salvar|Publicar|Travar|Excluir)/);
+});
