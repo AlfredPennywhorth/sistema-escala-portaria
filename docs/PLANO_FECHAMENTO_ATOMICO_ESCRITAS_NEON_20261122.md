@@ -60,3 +60,13 @@ Nenhum cliente web autenticado poderá executar INSERT/UPDATE/DELETE diretamente
 - `migration/neon/tests/11_write_surface_full_gate_readonly.sql`
 - `docs/AUDITORIA_COMPATIBILIDADE_SCHEMA_SUPABASE_NEON_20261121.md`
 - `docs/GO_NO_GO_CHECKLIST_20261129.md`
+
+## SQL proposta para revisão, ainda sem executar — 22/11
+
+- Arquivo: `migration/neon/12_atomic_write_surface_hardening_REVIEW_ONLY.sql`.
+- **NÃO EXECUTAR:** sua execução exige autorização separada de alteração dos privilégios na branch descartável, janela de drenagem e snapshot de HML. Não integrar a deploys, nem aplicar na origem Supabase ou Neon main.
+- A transação usa `LOCK TABLE ... ACCESS EXCLUSIVE`, `lock_timeout`, verificações de owner, RLS, número de RPCs, path seguro e pós-validação. Uma divergência gera erro e rollback.
+- **Bloqueio intencional:** a definição SQL04 atualmente instalada na HML compara estado/trava antes da revisão; o preflight recusa o pacote até instalação e homologação da variante OCC revision-first, separadamente autorizada. Isso é condição funcional antes de trocar privilégios.
+- O pacote altera apenas atributos `SECURITY DEFINER` das sete RPCs versionadas, seus grants e os GRANT/REVOKE das duas tabelas e RPC legada; não muda corpo da função, não insere/deleta dados e não migra identidades.
+- Mesmo com checagem de proprietário, `SECURITY DEFINER` pode contornar RLS. Validar **identidade JWT real**, defesa contra claims adulteradas e funções auxiliares antes de autorizar execução. A confirmação por CI/testes estáticos não prova segurança operacional.
+- Teste `tests/neon-write-hardening-proposal.test.mjs` e workflow só analisam texto; **nunca executam o SQL**. Solicitar revisão específica do Codex e, após ajustes, preparar ensaio de manutenção na branch descartável com aprovação explícita.
