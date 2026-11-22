@@ -29,8 +29,8 @@
 | **25/11** | B: revisão final, autorização e homologação **separada** SQL12; A: completar telas e fluxos Neon HML isolados | Sim, vedar DDL paralelo | bypass DML/RPC antiga fechado; sete RPCs legítimas seguem utilizáveis |
 | **26/11** | C: cópia **experimental isolada** de dados/identidades após backup e autorização, preservar 8 itens anômalos, 7 travados e IDs; A: integrar leitura/escrita/impressão | Sim, apenas ambiente destinado ao ensaio | contagens, FK, status, hashes/amostras e logins reconciliados |
 | **27/11** | D: smoke de 2 Admins, Auxiliar, recuperação de sessão, OCC real, fluxo completo de escalas e impressão, indisponibilidade/timeout | Não repetir básicos SQL06 já aprovados sem justificativa | regressão crítica zero, nenhuma escrita direta, histórico intacto |
-| **28/11** | D: última revisão CI/Codex, restore/rollback ensaiado, evidências preenchidas e Go/No-Go formal | Não | todos os gates independentes verificados por revisor e autorização explícita |
-| **29/11** | Cutover de produção **somente sob GO formal**; snapshot/backup de corte, reconciliação final, janela de escrita congelada, migração assistida, smoke e monitoramento | Sequência estrita | Neon operacional e dados conciliados; se falhar, abortar/reverter com autorização e registro |
+| **28/11** | D: última revisão CI/Codex, restore/rollback ensaiado e Go/No-Go; **preparar pacote específico do Neon main** (migrations adaptadas e revisadas, ordem de aplicação, baseline/rollback, permissões, Auth/Data API e plano de verificação); não executar em main ainda | Sim para documentação/código; aplicação em main só depois de GO | pacote de implantação do destino revisado, gaps resolvidos, gates independentes e autorização explícita |
+| **29/11** | **Somente com GO e autorizações distintas:** congelar/drenar escritores, snapshot/backup consistente; instalar pacote **próprio do Neon main** revisto (nunca executar diretamente SQL12/SQL13 REVIEW_ONLY de HML), validar funções/grants/RLS/triggers/JWT nesse destino, migrar/reconciliar dados e autenticação, liberar app de produção, smoke e monitoramento | Sequência estrita, sem abrir escritas antes de revalidar o destino | Neon main homologado no próprio ambiente, OCC/RLS/histórico/dados conciliados, rollback disponível; NO-GO se qualquer gate falhar |
 
 ## Precedências (não negociáveis)
 1. Dados reais **não** saem da origem para ensaio antes de backup restaurável comprovado e autorização específica.
@@ -39,13 +39,13 @@
 4. Neon Auth exige vínculo de identidade verificável: 3 identidades distintas, 4 vínculos legados deduplicados durante migração, sem registrar PII ou UUIDs reais no GitHub.
 5. A importação histórica respeita triggers de travamento: desenhar/ensaiar ordem segura numa instância isolada, sem desligar triggers no Supabase ou descartar registros antigos.
 6. Interface operacional só aponta à Neon após passar build, login real, leitura, escrita versionada, histórico, impressão e testes negativos. **Não usar fallback silencioso a Supabase**.
-7. A migração de produção requer autorização adicional: PR merge, branch Neon main, alterações de privilégios e deploy são ações independentes, cada uma com seu gate.
+7. **A HML não substitui prova no destino real:** SQL12 e SQL13 possuem restrições explícitas a ambiente descartável e **não devem ser executadas literalmente em Neon main**. Elaborar pacote de instalação específico da produção, com preflight e baseline revisados para o estado real do main, order/rollback, setup Auth/Data API, sete RPCs, RLS, grants (inclusive por coluna/herança), triggers e validações pós-aplicação no destino antes de admitir escritas. Esse pacote exige revisão Codex/CI próprias e aprovação humana. A migração de produção requer autorizações adicionais e distintas para mudança de Neon main, migração de dados/identidades, PR merge e Cloudflare deploy.
 
 ## Ordem de trabalho da implementação da UI (código apenas)
 1. Inventariar componentes e imports diretos de `supabase`, `useAuth`, `services/*`; mapear por tela e perfil. Produzir matriz de cobertura: funcionalidade atual -> adaptador Neon -> testes.
 2. Criar contrato de autenticação Neon separado, com sessão, role, login, logout, recuperação de acesso; provar envio/recebimento de código antes de liberar testes de usuários. Nunca presumir entrega de e-mail após resposta HTTP.
 3. Migrar leitura de auxiliares, restrições, rodízios e histórico; preservar modelos de impressão. Evitar leitura de itens/cabeçalho de snapshots diferentes; verificar revisão pós-leitura ou obter leitura transacional consistente.
-4. Conectar a escrita **somente** às sete RPCs versionadas e com revisão original do editor; tratar `P0001`, `42501` e timeout sem repetição cega. Impedir DML direto ou serviço `DELETE` + `INSERT` legado no runtime Neon.
+4. **Domínio de rodízios e itens:** conectar criação/edição/publicação/travamento/cancelamento/exclusão exclusivamente às sete RPCs administrativas versionadas, com revisão original do editor nas operações aplicáveis; tratar `P0001`, `42501` e timeout sem repetição cega. Impedir DML direto de `rodizios`/`rodizio_itens` e serviço `DELETE` + `INSERT` legado no runtime Neon. **Domínios de auxiliares e restrições:** as sete RPCs não atendem esses cadastros; `src/services/neon/auxiliaresService.ts` e `restricoesService.ts` usam DML próprio. Manter essa superfície separada e exigir auditoria explícita de GRANT/RLS por operação, papéis, autorização real JWT, integridade e negativa de perfis antes de liberar essas telas; se falhar, especificar RPCs adicionais em PR revisada, sem presumir que SQL12 cobre essas tabelas.
 5. Habilitar UI operacional apenas em build/site HML isolado com verificação de host/ambiente; realizar teste de compilação, contract tests e revisão. Produção fica inalterada.
 
 ## Responsabilidades e decisões rápidas
@@ -57,6 +57,19 @@
 | Mudanças SQL13 e SQL12 na branch descartável | Operador autorizado sob runbook | Autorização específica por intervenção, após snapshot/drenagem |
 | Migração experimental de dados/identidades | Operador autorizado | Autorização separada; mapa privado de contas |
 | Cutover Neon main, merge e Cloudflare produção | Responsável pelo release e revisor | Aprovação final explícita de cada mudança |
+
+
+## Gate obrigatório do destino Neon main (P2 Codex, incluído antes do corte)
+1. **Inventário real do main, somente leitura e com autorização de acesso:** registrar schema, funções, fingerprints, owners, triggers, RLS, grants por tabela/coluna/herança, Data API, Auth e endpoint, sem presumir igualdade com a branch descartável.
+2. **Artefato de implantação próprio da produção:** adaptar scripts de instalação/upgrade e pre/postflights ao baseline efetivo do main; preservar as validações fail-closed; não copiar SQL12/SQL13 HML REVIEW_ONLY para execução na principal. Documentar dependências, parâmetros, snapshot/rollback e ordem transacional.
+3. **Revisão independente e autorização antes de DDL/DML:** exigir CI, Codex no SHA do artefato e aprovação explícita do ambiente/escopo; sem autorização, permanecer em modo somente leitura.
+4. **Janela de corte e invariantes:** suspender ingressos de escrita, drenar escritores, criar snapshot recuperável após drenagem, instalar e conferir funções/grants/RLS/triggers no próprio main; testar JWT Admin/Auxiliar, bloqueio DML direto e RPC legada, OCC, proteção do histórico e integridade das tabelas **antes de abrir o tráfego de produção**.
+5. **Rollback e GO/NO-GO:** se o destino divergir, não reabrir escritas; reconciliar state e executar procedimento autorizado de retorno. Resultado HML é pré-requisito, nunca prova suficiente da produção.
+
+## Gate próprio de auxiliares e restrições (P2 Codex)
+- SQL12 fecha DML **somente** em `rodizios` e `rodizio_itens`. As sete RPCs versionadas implementam o domínio de escalas; não exigí-las para cadastrar/editar auxiliares ou restrições.
+- Para `auxiliares` e `restricoes_auxiliares`, avaliar operações efetivamente oferecidas pelos serviços Neon, grants e policies RLS atuais, segregação entre Admin/Coordenadora/Auxiliar, proteção de campos e sessão JWT; testar inserção/atualização/exclusão e negativas por perfil. Manter DML próprio **somente se** auditado e autorizado para esse domínio; de outro modo desenhar RPCs mínimas e revisadas.
+- Produção não recebe GO de UI E2E enquanto esses cadastros não estiverem integralmente testados. O fechamento P0 de OCC continua obrigatório e independente no domínio das escalas.
 
 ## Indicadores de decisão
 - **D23**: contrato/serviços Neon mapeados; backup iniciado; causa do problema de e-mail estabelecida.
