@@ -76,6 +76,7 @@ export function NeonOperacionalHml() {
       if (!valido()) return;
       if (confirmacao.error || confirmacao.data?.id !== id) {
         limparDados();
+        setCarregando(false);
         setErro('Sessão Neon alterada durante a consulta. Entre novamente e atualize.');
         return;
       }
@@ -83,6 +84,7 @@ export function NeonOperacionalHml() {
       if (!valido()) return;
       if (perfilFinal.error || perfilFinal.data?.perfil !== 'admin') {
         limparDados();
+        setCarregando(false);
         setErro('Perfil Neon alterado durante a consulta. Dados administrativos ocultados.');
         return;
       }
@@ -117,8 +119,10 @@ export function NeonOperacionalHml() {
     window.addEventListener('focus', revalidarAoRetornar);
     window.addEventListener('storage', revalidarAoRetornar);
     document.addEventListener('visibilitychange', revalidarAoRetornar);
-    void carregar();
+    // Iniciar após o setup do efeito, sem setState síncrono no corpo dele.
+    const inicio = window.setTimeout(() => { void carregar(); }, 0);
     return () => {
+      window.clearTimeout(inicio);
       montado.current = false;
       limparDados();
       subscription.unsubscribe();
