@@ -24,3 +24,14 @@ test('all seven approved versioned admin writes are in audit',()=>{
     'cancelar_rodizio_versionado','excluir_rodizio_rascunho_versionado'];
   for (const fn of funcs) assert.ok(sql.includes("'"+fn+"'"),fn);
 });
+
+test('read-only gate includes inherited and column-level effective permissions',()=>{
+ for(const role of ['authenticated','anonymous']){
+   for(const operation of ['INSERT','UPDATE']){
+     assert.ok(sql.includes("has_any_column_privilege('"+role+"',c.oid,'"+operation+"')"));
+   }
+ }
+ assert.match(sql,/tables_with_effective_column_dml/);
+ assert.match(sql,/direct_insert OR direct_update OR direct_delete OR column_insert OR column_update/);
+ assert.match(sql,/COALESCE\(BOOL_AND\(\(p\.proconfig @> ARRAY\['search_path=""'\]::text\[\]\) IS TRUE\),false\)/);
+});
