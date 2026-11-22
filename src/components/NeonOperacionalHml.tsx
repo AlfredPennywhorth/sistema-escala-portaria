@@ -18,6 +18,8 @@ export function NeonOperacionalHml() {
   const [rodizios, setRodizios] = useState<Rodizio[]>([]);
   const [auxiliares, setAuxiliares] = useState<Auxiliar[]>([]);
   const [restricoes, setRestricoes] = useState<RestricaoAuxiliar[]>([]);
+  const [filtroAuxiliar, setFiltroAuxiliar] = useState('');
+  const [mostrarInativas, setMostrarInativas] = useState(false);
   const [detalhe, setDetalhe] = useState<RodizioComItens | null>(null);
   const [abrindo, setAbrindo] = useState(false);
 
@@ -231,6 +233,66 @@ export function NeonOperacionalHml() {
                     </li>
                   ))}
                 </ul>
+              )}
+            </section>
+            <section className="rounded-xl bg-white p-4 shadow-sm" aria-label="Consulta de auxiliares e restrições">
+              <h2 className="text-lg font-semibold text-slate-900">Auxiliares e restrições — consulta</h2>
+              <p className="mt-1 text-sm text-slate-600">
+                Cadastro somente leitura, sujeito à sessão Admin e à RLS do Neon.
+                Alterações e exclusões permanecem desabilitadas.
+              </p>
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <label htmlFor="busca-auxiliar-neon" className="text-sm font-medium text-slate-700">
+                  Buscar auxiliar
+                </label>
+                <input
+                  id="busca-auxiliar-neon"
+                  className="min-w-0 flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  value={filtroAuxiliar}
+                  onChange={e => setFiltroAuxiliar(e.target.value)}
+                  placeholder="Nome da auxiliar"
+                />
+                <label className="flex items-center gap-2 text-sm text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={mostrarInativas}
+                    onChange={e => setMostrarInativas(e.target.checked)}
+                  />
+                  Incluir inativas
+                </label>
+              </div>
+              <ul className="mt-3 divide-y divide-slate-200">
+                {auxiliares
+                  .filter(auxiliar => (mostrarInativas || auxiliar.ativa) &&
+                    auxiliar.nome.toLocaleLowerCase('pt-BR').includes(filtroAuxiliar.trim().toLocaleLowerCase('pt-BR')))
+                  .map(auxiliar => {
+                    const regras = restricoes.filter(item => item.auxiliar_id === auxiliar.id);
+                    return (
+                      <li key={auxiliar.id} className="py-3">
+                        <p className="font-medium text-slate-900">
+                          {auxiliar.nome}{!auxiliar.ativa ? ' (inativa)' : ''}
+                        </p>
+                        <p className="text-sm text-slate-600">
+                          {regras.length} restrição(ões) ativa(s) visível(is)
+                        </p>
+                        {regras.length > 0 && (
+                          <ul className="mt-2 list-inside list-disc text-sm text-slate-700">
+                            {regras.map(regra => (
+                              <li key={regra.id}>
+                                {regra.tipo} · {regra.data || (regra.dia_semana != null
+                                  ? 'Dia da semana ' + regra.dia_semana : 'Recorrência não informada')}
+                                {regra.porta ? ' · ' + regra.porta : ''}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </li>
+                    );
+                  })}
+              </ul>
+              {auxiliares.filter(auxiliar => (mostrarInativas || auxiliar.ativa) &&
+                auxiliar.nome.toLocaleLowerCase('pt-BR').includes(filtroAuxiliar.trim().toLocaleLowerCase('pt-BR'))).length === 0 && (
+                <p className="py-3 text-sm text-slate-600">Nenhuma auxiliar corresponde ao filtro.</p>
               )}
             </section>
             {detalhe && (
