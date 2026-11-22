@@ -35,7 +35,7 @@ BEGIN
    SELECT 1 FROM pg_proc p
    WHERE p.oid=to_regprocedure('public.substituir_itens_rodizio_rascunho_versionado(uuid,jsonb,bigint)')
      AND md5(p.prosrc) = 'b06899977f63be59f8c993b05d134498'
-     AND p.prolang = 'plpgsql'::regproc::oid
+     AND p.prolang = (SELECT oid FROM pg_language WHERE lanname='plpgsql')
      AND p.prorettype = 'integer'::regtype
      AND p.provolatile = 'v'
      AND p.proisstrict = false
@@ -192,8 +192,8 @@ BEGIN
  IF NOT EXISTS (
    SELECT 1 FROM pg_proc p
    WHERE p.oid='public.substituir_itens_rodizio_rascunho_versionado(uuid,jsonb,bigint)'::regprocedure
-     AND md5(p.prosrc) = '7ec49b6eb29689bb8cc1aaad3dfa90b8'
-     AND p.prolang = 'plpgsql'::regproc::oid
+     AND md5(p.prosrc) = 'f2100180626d8fd8881aebb99ca57d0d'
+     AND p.prolang = (SELECT oid FROM pg_language WHERE lanname='plpgsql')
      AND p.prorettype = 'integer'::regtype
      AND p.provolatile = 'v'
      AND p.proisstrict = false
