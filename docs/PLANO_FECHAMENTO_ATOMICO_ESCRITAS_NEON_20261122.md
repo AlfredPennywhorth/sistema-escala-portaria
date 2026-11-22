@@ -70,3 +70,19 @@ Nenhum cliente web autenticado poderá executar INSERT/UPDATE/DELETE diretamente
 - O pacote altera apenas atributos `SECURITY DEFINER` das sete RPCs versionadas, seus grants e os GRANT/REVOKE das duas tabelas e RPC legada; não muda corpo da função, não insere/deleta dados e não migra identidades.
 - Mesmo com checagem de proprietário, `SECURITY DEFINER` pode contornar RLS. Validar **identidade JWT real**, defesa contra claims adulteradas e funções auxiliares antes de autorizar execução. A confirmação por CI/testes estáticos não prova segurança operacional.
 - Teste `tests/neon-write-hardening-proposal.test.mjs` e workflow só analisam texto; **nunca executam o SQL**. Solicitar revisão específica do Codex e, após ajustes, preparar ensaio de manutenção na branch descartável com aprovação explícita.
+
+## Correção dos achados Codex P1/P2 — 22/11/2026 (somente proposta)
+
+Na revisão do commit `bdee287683`, Codex identificou:
+- **P1:** `REVOKE` de DML no nível de tabela não elimina grants de INSERT/UPDATE por coluna. O postflight anterior, com apenas `has_table_privilege()`, poderia aprovar falsamente um Admin ainda apto a escrever sem OCC.
+- **P2:** `NOT (p.proconfig @> ...)` retorna `NULL` quando `proconfig` é `NULL`, permitindo elevar uma RPC sem `search_path` fixo para `SECURITY DEFINER`.
+
+Correção **no SQL review-only, não executado**:
+- Postflight verifica também `has_any_column_privilege('authenticated'|'anonymous', c.oid, 'INSERT'|'UPDATE')`, além de `has_table_privilege`; a verificação de privilégio efetivo considera herança de roles. **Com grant residual por coluna, aborta a transação inteira**. A proposta não tenta revogar cegamente grants por coluna: a presença deles exige inspeção e correção explícita antes da aplicação.
+- Preflight e postflight das sete RPCs usam `(p.proconfig @> ARRAY['search_path=""']::text[]) IS NOT TRUE`, rejeitando falso e nulo.
+- Testes estáticos atualizados em `tests/neon-write-hardening-proposal.test.mjs` e `tests/neon-write-surface-full.test.mjs`.
+- Preflight `migration/neon/tests/11_write_surface_full_gate_readonly.sql` inclui `tables_with_effective_column_dml` e exige ausência de permissões efetivas por coluna para `direct_dml_closed=true`.
+
+Execução **somente leitura** da auditoria atualizada na branch descartável confirmou: `tables_found=2`, `tables_with_direct_dml=2`, `tables_with_effective_column_dml=2`, `direct_dml_closed=false`, `legacy_authenticated_closed=false`. Isso demonstra o gate ainda aberto, mas **não demonstra a existência de grants exclusivamente por coluna**, pois privilégios de tabela também conferem privilégios efetivos de coluna. Será necessário inventariar `pg_attribute.attacl` e `pg_auth_members` antes da implantação. Nada foi alterado no banco.
+
+**Critério de avanço:** CI verde, nova revisão Codex sem bloqueios, correção SQL04, janela de suspensão/drenagem, autorização de DDL só na branch descartável e JWT real. Não realizar merge nem deploy de produção.
