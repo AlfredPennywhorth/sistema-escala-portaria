@@ -21,22 +21,26 @@
 6. Consulta de snapshots realizada em 22/11 retornou lista vazia no projeto; **não há snapshot restaurável comprovado**. Não criar, restaurar ou excluir snapshot sob esta autorização.
 7. As tabelas `rodizios` e `rodizio_itens` ainda apresentam DML direto efetivo para `authenticated`, e a RPC legada permanece um bypass de OCC conforme auditorias anteriores. **SQL13 não fecha esse P0**. SQL12 só depois de homologar SQL13 e com autorização específica.
 
+## Ordem obrigatória do ponto de recuperação (P2 Codex — 22/11)
+
+**Dependência sequencial, não checklist independente:** (1) suspender todas as novas escritas; (2) drenar escritores/transações já aceitos e comprovar a drenagem; (3) **somente então** obter snapshot de corte recuperável; (4) manter ingressos suspensos durante execução e homologação. Registrar timestamps verificáveis de cada passo, operador e identificação da branch. Snapshot histórico anterior à drenagem **não serve** como ponto de restauração do corte, porque pode descartar commits aceitos após sua captura. Se surgir escrita ou a continuidade do bloqueio não puder ser provada, **NO-GO** e refazer o corte. Nenhuma etapa deste parágrafo foi executada nesta atualização documental.
+
 ## Gate A — preparação e autorização antes de qualquer SQL13
 Responsável deve registrar, antes da janela, todos os itens abaixo com data, revisor e evidência. Ausência de qualquer um: **NO-GO**.
-- [ ] Autorização **específica** para criação do snapshot, se ainda necessário; snapshot da **branch descartável**, com ID, data/hora, retenção e estratégia de restauração; **validar recuperabilidade** sem tocar main.
+- [ ] Autorizar, quando necessário, a criação de snapshot **somente após** a suspensão de novas escritas e a drenagem comprovada de transações, nunca antes. Mesmo que já exista snapshot antigo, **não reutilizá-lo como snapshot de corte** sem demonstrar que representa exatamente o estado após a drenagem; na dúvida, obter novo snapshot de corte da **branch descartável**. Registrar ID, timestamp de início da suspensão, horário de conclusão da drenagem, timestamp do snapshot, retenção, estratégia de restauração e evidência temporal inequívoca de que **suspensão → drenagem → snapshot** ocorreu nessa ordem. Verificar recuperabilidade sem tocar main. A criação ou restauração exige autorização específica posterior.
 - [ ] Autorização **específica e separada** para execução de `migration/neon/13_sql04_revision_first_REVIEW_ONLY.sql`, limitada ao projeto, branch e banco acima.
 - [ ] HEAD e revisão Codex/CI do conteúdo a executar reconfirmados; arquivo revisado imutável e fingerprint do artefato de execução registrado.
 - [ ] Identificação do endpoint/branch por metadados Neon + conexão; abortar ante qualquer ambiguidade.
 - [ ] Inventário de **todos** os ingressos de escrita: tela HML, Data API, RPC legada, RPCs versionadas, clientes antigos, scripts, automações e sessões com privilégios. A suspensão precisa bloquear novas chamadas por todos esses caminhos; ocultar um botão não basta.
 - [ ] Suspensão efetiva de **novas** escritas, com responsáveis e horário registrado; manutenção até o encerramento da homologação.
-- [ ] Drenagem das transações e requisições já admitidas, com evidência de ausência de escritores/locks relevantes na branch e banco corretos. Uma leitura instantânea sem outras sessões não satisfaz esse gate. Não encerrar sessões sem autorização.
+- [ ] Drenagem das transações e requisições já admitidas **antes do snapshot de corte**, com horário de conclusão e evidência de ausência de escritores/locks relevantes na branch e banco corretos. Uma leitura instantânea sem outras sessões não satisfaz esse gate. Não encerrar sessões sem autorização. Se houver nova escrita entre a drenagem e o snapshot, **NO-GO**, restabelecer a suspensão/drenagem e obter novo snapshot de corte consistente.
 - [ ] Baseline de catálogos, atributos e corpo da RPC compatível com o fingerprint state-first; comparar sem normalização silenciosa.
 - [ ] Captura antes/depois da definição e atributos da RPC, das revisões e dos IDs/itens de **fixtures fictícias**. Não utilizar dados reais para testes destrutivos.
 - [ ] Plano de rollback ensaiado e responsável designado; distinguir **rollback transacional antes do commit** da **restauração após commit**; não presumir que um simples `ROLLBACK` reverte um commit já confirmado.
 - [ ] JWT real de **Admin** no ambiente descartável, perfis negativos de teste, duas sessões distintas e fixtures com estados/revisões controlados; sem inserir credenciais em GitHub.
 
 ## Gate B — futura execução somente após Gate A e autorização
-1. Manter admissão de escrita suspensa e confirmar novamente projeto/branch/banco/endpoint, drenagem e snapshot.
+1. Manter admissão de escrita suspensa e confirmar novamente projeto/branch/banco/endpoint, **linha do tempo comprovada suspensão → drenagem → snapshot de corte** e recuperabilidade. Snapshot anterior à drenagem não satisfaz o gate; qualquer nova escrita requer reiniciar o procedimento de corte e obter snapshot consistente.
 2. Executar **somente** a SQL13 revisada, em conexão dirigida à branch descartável, com a transação, `lock_timeout`, `statement_timeout`, lock e preflight/postflight do próprio arquivo.
 3. Diante de erro, timeout ou drift no preflight/postflight: interromper, verificar estado do commit e aplicar procedimento autorizado de reversão se necessário; nunca repetir automaticamente em caso de resultado de commit incerto.
 4. Registrar execução, início/fim, operador, hash do arquivo, estado final da transação, MD5 do corpo instalado e atributos; preservar logs sanitizados.
@@ -65,7 +69,7 @@ Responsável deve registrar, antes da janela, todos os itens abaixo com data, re
 | --- | --- |
 | Operador / revisor / autorização específica | PENDENTE |
 | Projeto / branch / DB / endpoint reconfirmados | PENDENTE |
-| Snapshot ID / recuperabilidade | PENDENTE |
+| Suspensão (timestamp) → drenagem (timestamp) → snapshot de corte (ID/timestamp) → recuperabilidade | PENDENTE |
 | Ingressos suspensos / início / fim / drenagem | PENDENTE |
 | Hash do arquivo SQL13 e baseline pré | PENDENTE |
 | Resultado SQL13 / transação / fingerprint pós | PENDENTE |
