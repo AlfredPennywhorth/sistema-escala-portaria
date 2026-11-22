@@ -313,3 +313,20 @@ test('Neon preview invalidates old sessions and discards stale async responses',
   assert.match(source, /confirmacao\.data\?\.id !== idInicial/);
   assert.match(source, /perfil\.data\?\.perfil !== 'admin'/);
 });
+
+test('Neon preview leaves loading state on session/profile invalidation', () => {
+  const source = read('src/components/NeonOperacionalHml.tsx');
+  for (const message of [
+    'Sessão Neon alterada durante a consulta',
+    'Perfil Neon alterado durante a consulta',
+  ]) {
+    const location = source.indexOf(message);
+    assert.ok(location > 0, message);
+    const before = source.slice(Math.max(0, location - 160), location);
+    assert.match(before, /limparDados\(\);\s*setCarregando\(false\);\s*setErro\(/,
+      message + ': must clear loading after invalidating pending generation');
+  }
+  assert.match(source, /window\.setTimeout\(\(\) => \{ void carregar\(\); \}, 0\)/);
+  assert.match(source, /window\.clearTimeout\(inicio\)/);
+  assert.doesNotMatch(source, /^\s+void carregar\(\);\s*$/m);
+});
