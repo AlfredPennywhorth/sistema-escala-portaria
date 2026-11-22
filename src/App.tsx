@@ -10,6 +10,7 @@ import { LoginPage } from './components/LoginPage';
 import { useAuth } from './hooks/useAuth';
 import { NeonAuthHomologacao } from './components/NeonAuthHomologacao';
 import { NeonRpcBranchHomologacao } from './components/NeonRpcBranchHomologacao';
+import { NeonOperacionalHml } from './components/NeonOperacionalHml';
 
 function AppPrincipal() {
   const { loading } = useAuth();
@@ -68,6 +69,12 @@ export function App() {
     const hostname = window.location.hostname.toLowerCase();
     const hostnameHml = hostname === 'rodizio-portaria-neon-hml.pages.dev' ||
       /^[a-z0-9-]+\.rodizio-portaria-neon-hml\.pages\.dev$/.test(hostname);
+    if (hostnameHml &&
+        new URLSearchParams(window.location.search).get('operacional-neon') === '1') {
+      // Prévia administrativa exclusivamente de leitura; a UI de produção
+      // permanece inalterada e todas as mutações seguem bloqueadas.
+      return <NeonOperacionalHml />;
+    }
     if (hostnameHml &&
         new URLSearchParams(window.location.search).get('rpc-branch-test') === '1') {
       return <NeonRpcBranchHomologacao />;
