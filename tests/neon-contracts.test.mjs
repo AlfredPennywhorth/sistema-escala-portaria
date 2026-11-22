@@ -291,3 +291,25 @@ test('Neon operational preview is read-only and isolated from production', () =>
   assert.doesNotMatch(source, /\.(?:insert|update|delete|upsert|rpc)\s*\(/);
   assert.doesNotMatch(source, /<button[^>]*>\s*(?:Salvar|Publicar|Travar|Excluir)/);
 });
+
+test('Neon preview invalidates old sessions and discards stale async responses', () => {
+  const source = read('src/components/NeonOperacionalHml.tsx');
+  assert.match(source, /onAuthStateChange\(/);
+  assert.match(source, /subscription\.unsubscribe\(\)/);
+  assert.match(source, /geracao\.current \+= 1/);
+  assert.match(source, /montado\.current && geracao\.current === atual/);
+  assert.match(source, /if \(!valido\(\)\) return/g);
+  assert.match(source, /identidadeAtiva\.current = null/);
+  assert.match(source, /setAutorizado\(false\)/);
+  assert.match(source, /setRodizios\(\[\]\)/);
+  assert.match(source, /setAuxiliares\(\[\]\)/);
+  assert.match(source, /setRestricoes\(\[\]\)/);
+  assert.match(source, /setDetalhe\(null\)/);
+  assert.match(source, /window\.addEventListener\('storage'/);
+  assert.match(source, /window\.addEventListener\('focus'/);
+  assert.match(source, /document\.addEventListener\('visibilitychange'/);
+  assert.match(source, /confirmacao\.data\?\.id !== id/);
+  assert.match(source, /perfilFinal\.data\?\.perfil !== 'admin'/);
+  assert.match(source, /confirmacao\.data\?\.id !== idInicial/);
+  assert.match(source, /perfil\.data\?\.perfil !== 'admin'/);
+});
