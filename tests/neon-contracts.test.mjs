@@ -330,3 +330,17 @@ test('Neon preview leaves loading state on session/profile invalidation', () => 
   assert.match(source, /window\.clearTimeout\(inicio\)/);
   assert.doesNotMatch(source, /^\s+void carregar\(\);\s*$/m);
 });
+
+test('Neon catalog UI filters locally and never opens mutation paths', () => {
+  const source = read('src/components/NeonOperacionalHml.tsx');
+  assert.match(source, /aria-label="Consulta de auxiliares e restrições"/);
+  assert.match(source, /filtroAuxiliar\.trim\(\)/);
+  assert.match(source, /mostrarInativas \|\| auxiliar\.ativa/);
+  assert.match(source, /restricoes\.filter\(item => item\.auxiliar_id === auxiliar\.id\)/);
+  assert.match(source, /regra\.tipo/);
+  assert.match(source, /regra\.data/);
+  assert.match(source, /regra\.dia_semana/);
+  assert.match(source, /regras\.map\(regra =>/);
+  assert.doesNotMatch(source, /\.(?:insert|update|delete|upsert|rpc)\s*\(/);
+  assert.doesNotMatch(source, /(?:criarAuxiliar|atualizarAuxiliar|desativarAuxiliar|reativarAuxiliar|criarRestricao|atualizarRestricao|excluirRestricao)\s*\(/);
+});
