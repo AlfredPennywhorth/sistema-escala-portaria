@@ -63,7 +63,7 @@ BEGIN
       'excluir_rodizio_rascunho_versionado'
     ) AND (
       pg_get_userbyid(p.proowner) <> 'rodizio_portas_owner'
-      OR NOT (p.proconfig @> ARRAY['search_path=""']::text[])
+      OR (p.proconfig @> ARRAY['search_path=""']::text[]) IS NOT TRUE
       OR p.prosecdef
       OR NOT has_function_privilege('authenticated',p.oid,'EXECUTE')
     );
@@ -127,6 +127,8 @@ GRANT EXECUTE ON FUNCTION
   TO authenticated;
 
 -- Postflight no MESMO commit: falha faz rollback integral do pacote.
+-- Inclui grants por coluna, inclusive efetivos via heranca de roles.
+-- Nao faz revogacao implicita desses grants: falha fechada se existirem.
 DO $postflight$
 DECLARE
   v_n integer;
@@ -140,6 +142,11 @@ BEGIN
       OR has_table_privilege('anonymous',c.oid,'INSERT')
       OR has_table_privilege('anonymous',c.oid,'UPDATE')
       OR has_table_privilege('anonymous',c.oid,'DELETE')
+      -- Um GRANT por coluna pode sobreviver ao REVOKE de tabela.
+      OR has_any_column_privilege('authenticated',c.oid,'INSERT')
+      OR has_any_column_privilege('authenticated',c.oid,'UPDATE')
+      OR has_any_column_privilege('anonymous',c.oid,'INSERT')
+      OR has_any_column_privilege('anonymous',c.oid,'UPDATE')
     );
   IF v_n <> 0 THEN
     RAISE EXCEPTION 'DML direto ainda acessivel, rollback'
@@ -162,6 +169,7 @@ BEGIN
       'cancelar_rodizio_versionado','excluir_rodizio_rascunho_versionado')
     AND (
       NOT p.prosecdef
+      OR (p.proconfig @> ARRAY['search_path=""']::text[]) IS NOT TRUE
       OR NOT has_function_privilege('authenticated',p.oid,'EXECUTE')
       OR has_function_privilege('anonymous',p.oid,'EXECUTE')
     );
