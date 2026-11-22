@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { obterPerfilUsuarioAtual, obterUsuarioAtual, logout } from '../services/neon/authService';
+import { criarClienteNeon } from '../lib/neon';
 import { listarRodiziosAdministrativosNeonHml, obterRodizioComItensNeonHml } from '../services/neon/rodizioFunctionalHmlService';
 import { listarAuxiliares } from '../services/neon/auxiliaresService';
 import { listarRestricoesAtivas } from '../services/neon/restricoesService';
@@ -20,77 +21,159 @@ export function NeonOperacionalHml() {
   const [detalhe, setDetalhe] = useState<RodizioComItens | null>(null);
   const [abrindo, setAbrindo] = useState(false);
 
-  const carregar = useCallback(async () => {
-    setCarregando(true);
-    setErro(null);
+  // Qualquer alteração de sessão invalida imediatamente o conteúdo anterior.
+  // A geração também impede respostas atrasadas de repovoar a tela.
+  const geracao = useRef(0);
+  const montado = useRef(false);
+  const identidadeAtiva = useRef<string | null>(null);
+
+  const limparDados = useCallback(() => {
+    geracao.current += 1;
+    identidadeAtiva.current = null;
     setAutorizado(false);
-    setDetalhe(null);
     setRodizios([]);
     setAuxiliares([]);
     setRestricoes([]);
+    setDetalhe(null);
+    setAbrindo(false);
+  }, []);
+
+  const carregar = useCallback(async () => {
+    limparDados();
+    const atual = geracao.current;
+    const valido = () => montado.current && geracao.current === atual;
+    setCarregando(true);
+    setErro(null);
     try {
       const identidade = await obterUsuarioAtual();
+      if (!valido()) return;
       if (identidade.error || !identidade.data) {
         setErro(identidade.error || 'Entre com uma conta de homologação Neon antes de consultar as escalas.');
         return;
       }
+      const id = identidade.data.id;
       const vinculo = await obterPerfilUsuarioAtual();
+      if (!valido()) return;
       if (vinculo.error || vinculo.data?.perfil !== 'admin') {
         setErro(vinculo.error || 'Esta prévia administrativa exige vínculo Admin validado no Neon.');
         return;
       }
-      setAutorizado(true);
       const [escalas, listaAuxiliares, listaRestricoes] = await Promise.all([
         listarRodiziosAdministrativosNeonHml(),
         listarAuxiliares(true),
         listarRestricoesAtivas(),
       ]);
+      if (!valido()) return;
       if (escalas.error || listaAuxiliares.error || listaRestricoes.error ||
           !escalas.data || !listaAuxiliares.data || !listaRestricoes.data) {
         setErro([escalas.error, listaAuxiliares.error, listaRestricoes.error]
           .filter(Boolean).join(' | ') || 'Falha em consulta Neon; nenhum dado parcial foi exibido.');
         return;
       }
+
+      // A sessão pode mudar enquanto o servidor executa consultas.
+      const confirmacao = await obterUsuarioAtual();
+      if (!valido()) return;
+      if (confirmacao.error || confirmacao.data?.id !== id) {
+        limparDados();
+        setErro('Sessão Neon alterada durante a consulta. Entre novamente e atualize.');
+        return;
+      }
+      const perfilFinal = await obterPerfilUsuarioAtual();
+      if (!valido()) return;
+      if (perfilFinal.error || perfilFinal.data?.perfil !== 'admin') {
+        limparDados();
+        setErro('Perfil Neon alterado durante a consulta. Dados administrativos ocultados.');
+        return;
+      }
+      identidadeAtiva.current = id;
       setRodizios(escalas.data);
       setAuxiliares(listaAuxiliares.data);
       setRestricoes(listaRestricoes.data);
+      setAutorizado(true);
     } catch {
-      setErro('Falha na leitura operacional Neon. Confira a sessão e o ambiente.');
+      if (valido()) setErro('Falha na leitura operacional Neon. Confira a sessão e o ambiente.');
     } finally {
-      setCarregando(false);
+      if (valido()) setCarregando(false);
     }
-  }, []);
+  }, [limparDados]);
 
-  useEffect(() => { void carregar(); }, [carregar]);
+  useEffect(() => {
+    montado.current = true;
+    const cliente = criarClienteNeon();
+    const { data: { subscription } } = cliente.auth.onAuthStateChange(() => {
+      // Inclui logout/login em outra aba quando propagados pelo SDK.
+      limparDados();
+      setCarregando(false);
+      setErro('Sessão Neon modificada. Atualize as consultas para revalidar o perfil.');
+    });
+    const revalidarAoRetornar = () => {
+      // Eventos de foco/visibilidade/storage complementam a propagação
+      // entre abas; não reutilizar dados administrativos sem revalidar.
+      limparDados();
+      setCarregando(false);
+      setErro('Revalide sua sessão Neon para exibir novamente os dados.');
+    };
+    window.addEventListener('focus', revalidarAoRetornar);
+    window.addEventListener('storage', revalidarAoRetornar);
+    document.addEventListener('visibilitychange', revalidarAoRetornar);
+    void carregar();
+    return () => {
+      montado.current = false;
+      limparDados();
+      subscription.unsubscribe();
+      window.removeEventListener('focus', revalidarAoRetornar);
+      window.removeEventListener('storage', revalidarAoRetornar);
+      document.removeEventListener('visibilitychange', revalidarAoRetornar);
+    };
+  }, [carregar, limparDados]);
 
   async function abrirRodizio(id: string) {
+    if (!autorizado || !identidadeAtiva.current || carregando || abrindo) return;
+    const atual = geracao.current;
+    const idInicial = identidadeAtiva.current;
+    const valido = () => montado.current && geracao.current === atual &&
+      identidadeAtiva.current === idInicial;
     setAbrindo(true);
     setErro(null);
     setDetalhe(null);
     try {
       const result = await obterRodizioComItensNeonHml(id);
+      if (!valido()) return;
       if (result.error || !result.data) {
         setErro(result.error || 'Escala indisponível. Consulte novamente.');
         return;
       }
+      const confirmacao = await obterUsuarioAtual();
+      if (!valido()) return;
+      if (confirmacao.error || confirmacao.data?.id !== idInicial) {
+        limparDados();
+        setErro('A sessão mudou enquanto os itens eram consultados.');
+        return;
+      }
+      const perfil = await obterPerfilUsuarioAtual();
+      if (!valido()) return;
+      if (perfil.error || perfil.data?.perfil !== 'admin') {
+        limparDados();
+        setErro('Permissão administrativa alterada. Os itens foram ocultados.');
+        return;
+      }
       setDetalhe(result.data);
+    } catch {
+      if (valido()) setErro('Falha ao consultar itens Neon.');
     } finally {
-      setAbrindo(false);
+      if (valido()) setAbrindo(false);
     }
   }
 
   async function sair() {
+    limparDados(); // nunca manter conteúdo enquanto logout está pendente
+    setCarregando(false);
     setErro(null);
     const resultado = await logout();
-    if (resultado.error) {
-      setErro(resultado.error);
-      return;
+    if (resultado.error && montado.current) {
+      setErro('Não foi possível encerrar a sessão. Dados ocultados; confira o acesso: ' + resultado.error);
     }
-    setAutorizado(false);
-    setRodizios([]);
-    setAuxiliares([]);
-    setRestricoes([]);
-    setDetalhe(null);
   }
 
   const btn = 'rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-800 disabled:opacity-50';
