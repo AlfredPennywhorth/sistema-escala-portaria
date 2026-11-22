@@ -11,6 +11,7 @@ on:
       - 'tests/neon-identity-reconciliation.test.mjs'
       - 'tests/neon-write-surface-full.test.mjs'
       - 'tests/neon-write-hardening-proposal.test.mjs'
+      - 'tests/neon-sql04-revision-order.test.mjs'
       - 'scripts/check-neon-release-gates.mjs'
       - 'package.json'
       - 'tsconfig*.json'
@@ -64,5 +65,7 @@ jobs:
         run: node --test tests/neon-write-surface-full.test.mjs
       - name: Validate write hardening proposal (offline, never executes SQL)
         run: node --test tests/neon-write-hardening-proposal.test.mjs
+      - name: Validate SQL04 revision-first repair (offline, no SQL execution)
+        run: node --test tests/neon-sql04-revision-order.test.mjs
       - name: ESLint
         run: npm run lint
