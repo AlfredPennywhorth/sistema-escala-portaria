@@ -52,6 +52,12 @@ export function NeonAuthHomologacao() {
         <p className="mt-2 text-sm text-slate-600">
           Ambiente de testes isolado. Não utilize senhas de produção enquanto as contas não forem migradas.
         </p>
+        <a
+          className="mt-3 inline-block rounded-md border border-blue-600 px-4 py-2 text-sm font-medium text-blue-800"
+          href="?operacional-neon=1"
+        >
+          Abrir prévia operacional Neon (somente leitura, exige Admin)
+        </a>
         <form
           className="mt-5 space-y-3"
           onSubmit={(e) => {
