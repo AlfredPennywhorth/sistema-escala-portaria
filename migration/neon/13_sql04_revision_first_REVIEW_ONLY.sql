@@ -4,6 +4,9 @@
 -- Nao altera dados, RLS, grants, colunas nem SQL05/SQL06.
 -- Parte de 04_optimistic_revision_drafts_PROPOSAL.sql, SEM o ALTER TABLE
 -- original para impedir impacto de schema na correção de ordem.
+-- A baseline instalada foi confrontada com a proposta canonica; sua unica
+-- diferenca semantica normalizada e a inversao dos blocos estado/revisao.
+-- O fingerprint exato do CORPO previne qualquer outra alteracao silenciosa.
 -- Requer branch exata br-holy-term-b6v6ofea e banco rodizio_portas;
 -- current_database() isoladamente NAO comprova branch. Conferir endpoint externo.
 -- Concluir teste de JWT Admin: revisão obsoleta + escala publicada/travada
@@ -24,11 +27,21 @@ BEGIN
  IF v_source IS NULL THEN
    RAISE EXCEPTION 'SQL04 nao instalada; abortando' USING ERRCODE='42501';
  END IF;
- IF position('if v_travado or v_status' IN lower(v_source))=0 OR
-    position('if v_revisao_atual is distinct from p_revisao_esperada' IN lower(v_source))=0 OR
-    position('if v_travado or v_status' IN lower(v_source)) >
-    position('if v_revisao_atual is distinct from p_revisao_esperada' IN lower(v_source)) THEN
-   RAISE EXCEPTION 'SQL04 instalada nao corresponde ao estado conhecido; abortando' USING ERRCODE='42501';
+ -- Baseline exata do CORPO instalado (pg_proc.prosrc), validada por
+ -- leitura do catalogo na branch descartavel em 22/11/2026.
+ -- Impede substituir silenciosamente qualquer outra divergencia funcional.
+ -- NAO normalizar whitespace, comentarios, literais ou SQL: qualquer drift aborta.
+ IF NOT EXISTS (
+   SELECT 1 FROM pg_proc p
+   WHERE p.oid=to_regprocedure('public.substituir_itens_rodizio_rascunho_versionado(uuid,jsonb,bigint)')
+     AND md5(p.prosrc) = 'b06899977f63be59f8c993b05d134498'
+     AND p.prolang = 'plpgsql'::regproc::oid
+     AND p.prorettype = 'integer'::regtype
+     AND p.provolatile = 'v'
+     AND p.proisstrict = false
+ ) THEN
+   RAISE EXCEPTION 'Drift SQL04 instalado: corpo nao corresponde a baseline exata; abortando'
+     USING ERRCODE='42501';
  END IF;
  IF NOT EXISTS (SELECT 1 FROM pg_proc p WHERE p.oid=to_regprocedure('public.substituir_itens_rodizio_rascunho_versionado(uuid,jsonb,bigint)')
    AND NOT p.prosecdef AND pg_get_userbyid(p.proowner)='rodizio_portas_owner'
@@ -174,11 +187,18 @@ DECLARE v_source text;
 BEGIN
  SELECT pg_get_functiondef('public.substituir_itens_rodizio_rascunho_versionado(uuid,jsonb,bigint)'::regprocedure)
   INTO v_source;
- IF position('if v_revisao_atual is distinct from p_revisao_esperada' IN lower(v_source))=0 OR
-    position('if v_travado or v_status' IN lower(v_source))=0 OR
-    position('if v_revisao_atual is distinct from p_revisao_esperada' IN lower(v_source)) >
-    position('if v_travado or v_status' IN lower(v_source)) THEN
-   RAISE EXCEPTION 'Ordem SQL04 nao corrigida; rollback' USING ERRCODE='42501';
+ -- Compare o corpo instalado APOS CREATE OR REPLACE com a baseline
+ -- exata da proposta revision-first. Divergencia gera rollback integral.
+ IF NOT EXISTS (
+   SELECT 1 FROM pg_proc p
+   WHERE p.oid='public.substituir_itens_rodizio_rascunho_versionado(uuid,jsonb,bigint)'::regprocedure
+     AND md5(p.prosrc) = '7ec49b6eb29689bb8cc1aaad3dfa90b8'
+     AND p.prolang = 'plpgsql'::regproc::oid
+     AND p.prorettype = 'integer'::regtype
+     AND p.provolatile = 'v'
+     AND p.proisstrict = false
+ ) THEN
+   RAISE EXCEPTION 'Corpo SQL04 revision-first inesperado; rollback' USING ERRCODE='42501';
  END IF;
  IF NOT EXISTS (SELECT 1 FROM pg_proc p WHERE p.oid='public.substituir_itens_rodizio_rascunho_versionado(uuid,jsonb,bigint)'::regprocedure
    AND NOT p.prosecdef AND pg_get_userbyid(p.proowner)='rodizio_portas_owner'
