@@ -8,6 +8,8 @@ type DiagnosticoVinculo = {
   vinculoVisivelPelaRls: boolean;
   perfilVisivel: string | null;
   consultaSemErro: boolean;
+  jwtPostgresDisponivel: boolean | null;
+  jwtPostgresCoincideComAuth: boolean | null;
   orientacao: string;
 };
 
@@ -25,6 +27,8 @@ export async function diagnosticarVinculoNeonHml(emailEsperado: string): Promise
     vinculoVisivelPelaRls: false,
     perfilVisivel: null,
     consultaSemErro: false,
+    jwtPostgresDisponivel: null,
+    jwtPostgresCoincideComAuth: null,
     orientacao: 'Diagnóstico não concluído.',
   };
   if (import.meta.env.VITE_NEON_HOMOLOGACAO_ENABLED !== 'true') {
@@ -69,6 +73,16 @@ export async function diagnosticarVinculoNeonHml(emailEsperado: string): Promise
       return { ...resultado, orientacao: 'Identidade da sessão difere da identidade confirmada ou do e-mail informado; não consultar privilégios.' };
     }
 
+    // Função SQL STABLE já existente: SELECT auth.uid(). Nenhum UUID é
+    // retornado à interface. A comparação ajuda a separar JWT ausente
+    // no PostgreSQL de filtro RLS ou divergência de ambiente.
+    const jwtSql = await cliente.rpc('usuario_atual_id');
+    if (alterouSessao) return invalido();
+    const identidadeSql = typeof jwtSql.data === 'string' ? jwtSql.data : null;
+    const jwtPostgresDisponivel = jwtSql.error ? null : Boolean(identidadeSql);
+    const jwtPostgresCoincideComAuth = jwtSql.error || !identidadeSql
+      ? null : identidadeSql === idInicial;
+
     const perfil = await cliente.from('usuarios_auxiliares')
       .select('user_id,perfil')
       .eq('user_id', usuario.data.user.id)
@@ -89,12 +103,20 @@ export async function diagnosticarVinculoNeonHml(emailEsperado: string): Promise
       return { ...resultado, orientacao: 'Consulta da RLS retornou erro. O diagnóstico não revela mensagens técnicas sensíveis.' };
     }
     if (perfil.data && perfil.data.user_id !== idInicial) return invalido();
+    resultado.jwtPostgresDisponivel = jwtPostgresDisponivel;
+    resultado.jwtPostgresCoincideComAuth = jwtPostgresCoincideComAuth;
     resultado.consultaSemErro = true;
     resultado.vinculoVisivelPelaRls = Boolean(perfil.data);
     resultado.perfilVisivel = perfil.data?.perfil ?? null;
-    resultado.orientacao = perfil.data
-      ? 'Vínculo visível pela sessão JWT/RLS. O perfil mostrado é o cadastrado, não uma promoção automática.'
-      : 'Nenhum vínculo visível pela RLS para a identidade confirmada; pode haver filtro por JWT/RLS ou divergência de ambiente. Não criar vínculo sem reconciliação.';
+    resultado.orientacao = jwtSql.error
+      ? 'RPC de identidade PostgreSQL indisponível. Não é possível concluir se o JWT chegou ao SQL; verificar configuração de exposição e grants.'
+      : jwtPostgresDisponivel === false
+        ? 'Identidade JWT ausente no contexto PostgreSQL; investigar transmissão do token à Data API.'
+        : jwtPostgresCoincideComAuth === false
+          ? 'Identidade do JWT PostgreSQL difere da sessão Neon Auth; investigar origem do token.'
+          : perfil.data
+            ? 'Vínculo visível pela sessão JWT/RLS. O perfil mostrado é o cadastrado, não uma promoção automática.'
+            : 'Identidade SQL verificada; nenhum vínculo visível pela RLS. Investigar branch de destino e políticas sem criar cadastro.';
     return alterouSessao ? invalido() : resultado;
   } catch {
     return { ...resultado, vinculoVisivelPelaRls: false, perfilVisivel: null,
