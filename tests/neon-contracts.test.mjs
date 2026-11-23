@@ -379,3 +379,21 @@ test('Neon HML vínculo diagnostic stays read-only and redacts identifiers', () 
   assert.match(ui, /Diagnosticar vínculo JWT\/RLS \(somente leitura\)/);
   assert.match(ui, /diagnosticarVinculoNeonHml\(email\)/);
 });
+
+test('Neon vínculo diagnostic invalidates session changes during RLS and never presents mixed identity', () => {
+  const service = read('src/services/neon/authVinculoDiagnosticHmlService.ts');
+  assert.match(service, /onAuthStateChange\(evento =>/);
+  assert.match(service, /evento !== 'INITIAL_SESSION'/);
+  assert.match(service, /alterouSessao = true/);
+  assert.match(service, /subscription\.unsubscribe\(\)/);
+  assert.match(service, /const idInicial = sessao\.data\.session\.user\.id/);
+  assert.match(service, /const tokenInicial = sessao\.data\.session\.access_token/);
+  assert.match(service, /if \(alterouSessao\) return invalido\(\);\s*const sessaoFinal = await cliente\.auth\.getSession\(\)/);
+  assert.match(service, /sessaoFinal\.data\.session\?\.user\.id !== idInicial/);
+  assert.match(service, /sessaoFinal\.data\.session\?\.access_token !== tokenInicial/);
+  assert.match(service, /const usuarioFinal = await cliente\.auth\.getUser\(\)/);
+  assert.match(service, /usuarioFinal\.data\.user\?\.id !== idInicial/);
+  assert.match(service, /if \(perfil\.data && perfil\.data\.user_id !== idInicial\) return invalido\(\)/);
+  assert.match(service, /vinculoVisivelPelaRls: false,\s*perfilVisivel: null,\s*consultaSemErro: false/);
+  assert.match(service, /return alterouSessao \? invalido\(\) : resultado/);
+});
