@@ -162,6 +162,18 @@ export function NeonAuthHomologacao() {
           >Diagnosticar vínculo JWT/RLS (somente leitura)</button>
           <button
             type="button"
+            className="rounded-md border border-blue-600 bg-blue-50 px-4 py-3 text-blue-900 disabled:opacity-50"
+            disabled={ocupado}
+            onClick={() => void executar(async () => {
+              // Identidade obtida diretamente da sessão validada no Neon Auth.
+              // Não compara o e-mail digitado: este modo NÃO confirma a conta esperada.
+              const resultado = await diagnosticarVinculoNeonHml('');
+              setResumo(JSON.stringify(resultado, null, 2));
+              setMensagem('Diagnóstico somente leitura da identidade autenticada, sem comparar e-mail digitado. Este resultado não comprova que a sessão pertence à conta esperada. Nenhuma permissão foi alterada.');
+            })}
+          >Diagnosticar minha sessão autenticada (sem novo código)</button>
+          <button
+            type="button"
             className="rounded-md border border-slate-300 px-4 py-3 text-slate-800 disabled:opacity-50"
             disabled={ocupado}
             onClick={() => void executar(async () => {
