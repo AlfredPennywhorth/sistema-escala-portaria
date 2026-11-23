@@ -344,3 +344,20 @@ test('Neon catalog UI filters locally and never opens mutation paths', () => {
   assert.doesNotMatch(source, /\.(?:insert|update|delete|upsert|rpc)\s*\(/);
   assert.doesNotMatch(source, /(?:criarAuxiliar|atualizarAuxiliar|desativarAuxiliar|reativarAuxiliar|criarRestricao|atualizarRestricao|excluirRestricao)\s*\(/);
 });
+
+test('Neon draft preparation preserves source revision and cannot write', () => {
+  const ui = read('src/components/NeonOperacionalHml.tsx');
+  const source = read('src/components/NeonRascunhoPreparacaoHml.tsx');
+  assert.match(ui, /<NeonRascunhoPreparacaoHml/);
+  assert.match(ui, /detalhe\.rodizio\.status === 'rascunho'/);
+  assert.match(ui, /!detalhe\.rodizio\.travado/);
+  assert.match(ui, /key=\{detalhe\.rodizio\.id/);
+  assert.match(source, /revisaoOriginal = escala\.revisao/);
+  assert.match(source, /escala\.status !== 'rascunho' \|\| escala\.travado/);
+  assert.match(source, /dataValida\(cabecalho\.dataInicio\)/);
+  assert.match(source, /dataValida\(item\.data\)/);
+  assert.match(source, /setItens\(anteriores =>/);
+  assert.doesNotMatch(source, /criarClienteNeon|(?:salvarRascunho|publicarRodizio|travarRodizio|substituirItensRascunho)/);
+  assert.doesNotMatch(source, /\.(?:insert|update|delete|upsert|rpc)\s*\(/);
+  assert.doesNotMatch(source, /<button/);
+});
