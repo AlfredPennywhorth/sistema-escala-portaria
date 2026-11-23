@@ -382,7 +382,7 @@ test('Neon HML vínculo diagnostic stays read-only and redacts identifiers', () 
 
 test('Neon vínculo diagnostic invalidates session changes during RLS and never presents mixed identity', () => {
   const service = read('src/services/neon/authVinculoDiagnosticHmlService.ts');
-  assert.match(service, /onAuthStateChange\(evento =>/);
+  assert.match(service, /onAuthStateChange\(\(evento: string\) =>/);
   assert.match(service, /evento !== 'INITIAL_SESSION'/);
   assert.match(service, /alterouSessao = true/);
   assert.match(service, /subscription\.unsubscribe\(\)/);
