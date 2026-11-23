@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { confirmarCodigoEmail, loginComEmailSenha, logout, solicitarCodigoEmail } from '../services/neon/authService';
+import { diagnosticarVinculoNeonHml } from '../services/neon/authVinculoDiagnosticHmlService';
 import { verificarNeonPilot, verificarLeituraEscalasNeon, verificarPermissoesAuxiliarNeon } from '../services/neonPilotService';
 import { verificarEscritaRestricoesNeon } from '../services/neonWriteAuditService';
 import { verificarEscritaItensRascunhoNeon } from '../services/neonItensWriteAuditService';
@@ -149,6 +150,16 @@ export function NeonAuthHomologacao() {
             disabled={ocupado}
             onClick={() => void executar(conferirSessao)}
           >Verificar sessão e perfil</button>
+          <button
+            type="button"
+            className="rounded-md border border-slate-300 px-4 py-3 text-slate-800 disabled:opacity-50"
+            disabled={ocupado}
+            onClick={() => void executar(async () => {
+              const resultado = await diagnosticarVinculoNeonHml(email);
+              setResumo(JSON.stringify(resultado, null, 2));
+              setMensagem('Diagnóstico somente leitura: sem mostrar e-mail, UUID, JWT ou código. Nenhuma permissão foi alterada.');
+            })}
+          >Diagnosticar vínculo JWT/RLS (somente leitura)</button>
           <button
             type="button"
             className="rounded-md border border-slate-300 px-4 py-3 text-slate-800 disabled:opacity-50"
