@@ -99,12 +99,14 @@ export async function diagnosticarVinculoNeonHml(emailEsperado: string): Promise
         usuarioFinal.data.user?.id !== idInicial ||
         usuarioFinal.data.user?.email?.trim().toLocaleLowerCase('en-US') !==
           usuario.data.user.email?.trim().toLocaleLowerCase('en-US')) return invalido();
+    // Somente após reconfirmar a sessão, conservar os indicadores da RPC,
+    // inclusive quando a consulta RLS falha (sem divulgar o erro técnico).
+    resultado.jwtPostgresDisponivel = jwtPostgresDisponivel;
+    resultado.jwtPostgresCoincideComAuth = jwtPostgresCoincideComAuth;
     if (perfil.error) {
       return { ...resultado, orientacao: 'Consulta da RLS retornou erro. O diagnóstico não revela mensagens técnicas sensíveis.' };
     }
     if (perfil.data && perfil.data.user_id !== idInicial) return invalido();
-    resultado.jwtPostgresDisponivel = jwtPostgresDisponivel;
-    resultado.jwtPostgresCoincideComAuth = jwtPostgresCoincideComAuth;
     resultado.consultaSemErro = true;
     resultado.vinculoVisivelPelaRls = Boolean(perfil.data);
     resultado.perfilVisivel = perfil.data?.perfil ?? null;
