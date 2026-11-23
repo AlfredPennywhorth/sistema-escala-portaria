@@ -374,7 +374,10 @@ test('Neon HML vínculo diagnostic stays read-only and redacts identifiers', () 
   assert.match(service, /\.eq\('user_id', usuario\.data\.user\.id\)/);
   assert.match(service, /\.maybeSingle\(\)/);
   assert.match(service, /nenhum vínculo visível pela RLS/);
-  assert.doesNotMatch(service, /\.(?:insert|update|delete|upsert|rpc)\s*\(/);
+  // Somente a RPC STABLE de identidade é autorizada neste diagnóstico.
+  assert.doesNotMatch(service, /\.(?:insert|update|delete|upsert)\s*\(/);
+  const rpcs = [...service.matchAll(/\.rpc\s*\(\s*['"]([^'"]+)['"]/g)].map((m) => m[1]);
+  assert.deepEqual(rpcs, ['usuario_atual_id']);
   assert.doesNotMatch(service, /(?:console\.(?:log|error)|JSON\.stringify\(usuario)/);
   assert.match(ui, /Diagnosticar vínculo JWT\/RLS \(somente leitura\)/);
   assert.match(ui, /diagnosticarVinculoNeonHml\(email\)/);
@@ -411,4 +414,19 @@ test('Neon JWT Postgres HML diagnostic reads existing stable identity RPC withou
   assert.match(service, /Identidade do JWT PostgreSQL difere da sessão Neon Auth/);
   assert.match(service, /RPC de identidade PostgreSQL indisponível/);
   assert.doesNotMatch(service, /console\.(?:log|error)\(/);
+});
+
+test('Neon JWT flags survive an RLS read error only after session revalidation', () => {
+  const service = read('src/services/neon/authVinculoDiagnosticHmlService.ts');
+  const lastAuthCheck = service.indexOf('const usuarioFinal = await cliente.auth.getUser()');
+  const jwtAvailable = service.indexOf('resultado.jwtPostgresDisponivel = jwtPostgresDisponivel;');
+  const jwtMatches = service.indexOf('resultado.jwtPostgresCoincideComAuth = jwtPostgresCoincideComAuth;');
+  const rlsError = service.indexOf('if (perfil.error) {');
+  const rlsSuccess = service.indexOf('resultado.consultaSemErro = true;');
+  assert.ok(lastAuthCheck >= 0 && lastAuthCheck < jwtAvailable);
+  assert.ok(jwtAvailable < jwtMatches && jwtMatches < rlsError);
+  assert.ok(rlsError < rlsSuccess);
+  assert.match(service, /if \(perfil\.error\) \{\s*return \{ \.\.\.resultado, orientacao: 'Consulta da RLS retornou erro\./);
+  assert.match(service, /consultaSemErro: false,/);
+  assert.match(service, /if \(alterouSessao \|\| usuarioFinal\.error/);
 });
