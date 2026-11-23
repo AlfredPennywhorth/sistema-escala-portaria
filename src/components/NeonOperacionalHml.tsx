@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { obterPerfilUsuarioAtual, obterUsuarioAtual, logout } from '../services/neon/authService';
 import { criarClienteNeon } from '../lib/neon';
+import { NeonRascunhoPreparacaoHml } from './NeonRascunhoPreparacaoHml';
 import { listarRodiziosAdministrativosNeonHml, obterRodizioComItensNeonHml } from '../services/neon/rodizioFunctionalHmlService';
 import { listarAuxiliares } from '../services/neon/auxiliaresService';
 import { listarRestricoesAtivas } from '../services/neon/restricoesService';
@@ -309,6 +310,13 @@ export function NeonOperacionalHml() {
                   ))}
                 </ul>
               </section>
+            )}
+            {detalhe && detalhe.rodizio.status === 'rascunho' && !detalhe.rodizio.travado && (
+              <NeonRascunhoPreparacaoHml
+                key={detalhe.rodizio.id + ':' + String((detalhe.rodizio as Rodizio & { revisao?: number | string }).revisao ?? '')}
+                detalhe={detalhe}
+                auxiliares={auxiliares}
+              />
             )}
           </>
         )}
