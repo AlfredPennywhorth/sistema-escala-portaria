@@ -5,6 +5,7 @@ on:
       - 'src/**'
       - 'migration/neon/**'
       - 'tests/neon-contracts.test.mjs'
+      - 'tests/neon-vinculo-diagnostic.test.mjs'
       - 'tests/neon-release-gates.test.mjs'
       - 'tests/neon-backup-files.test.mjs'
       - 'scripts/check-supabase-backup-files.mjs'
@@ -55,6 +56,8 @@ jobs:
           CF_PAGES_BRANCH: chore/neon-migration-prep-20261115
       - name: Check Neon OCC and authorization contracts (static, offline)
         run: node --test tests/neon-contracts.test.mjs
+      - name: Validate Neon HML JWT/RLS diagnostic behavior (mocked, offline)
+        run: node --test tests/neon-vinculo-diagnostic.test.mjs
       - name: Validate backup file verifier (offline fixtures only)
         run: node --test tests/neon-backup-files.test.mjs
       - name: Validate production Go/No-Go checks (offline)
