@@ -361,3 +361,21 @@ test('Neon draft preparation preserves source revision and cannot write', () => 
   assert.doesNotMatch(source, /\.(?:insert|update|delete|upsert|rpc)\s*\(/);
   assert.doesNotMatch(source, /<button/);
 });
+
+test('Neon HML vínculo diagnostic stays read-only and redacts identifiers', () => {
+  const service = read('src/services/neon/authVinculoDiagnosticHmlService.ts');
+  const ui = read('src/components/NeonAuthHomologacao.tsx');
+  assert.match(service, /VITE_NEON_HOMOLOGACAO_ENABLED !== 'true'/);
+  assert.match(service, /auth\.getSession\(\)/);
+  assert.match(service, /auth\.getUser\(\)/);
+  assert.match(service, /sessao\.data\.session\.user\.id === usuario\.data\.user\.id/);
+  assert.match(service, /emailDaSessaoConfereComInformado/);
+  assert.match(service, /\.from\('usuarios_auxiliares'\)/);
+  assert.match(service, /\.eq\('user_id', usuario\.data\.user\.id\)/);
+  assert.match(service, /\.maybeSingle\(\)/);
+  assert.match(service, /Nenhum vínculo visível pela RLS/);
+  assert.doesNotMatch(service, /\.(?:insert|update|delete|upsert|rpc)\s*\(/);
+  assert.doesNotMatch(service, /(?:console\.(?:log|error)|JSON\.stringify\(usuario)/);
+  assert.match(ui, /Diagnosticar vínculo JWT\/RLS \(somente leitura\)/);
+  assert.match(ui, /diagnosticarVinculoNeonHml\(email\)/);
+});
