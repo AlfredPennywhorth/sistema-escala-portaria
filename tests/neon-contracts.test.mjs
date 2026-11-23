@@ -373,7 +373,7 @@ test('Neon HML vínculo diagnostic stays read-only and redacts identifiers', () 
   assert.match(service, /\.from\('usuarios_auxiliares'\)/);
   assert.match(service, /\.eq\('user_id', usuario\.data\.user\.id\)/);
   assert.match(service, /\.maybeSingle\(\)/);
-  assert.match(service, /Nenhum vínculo visível pela RLS/);
+  assert.match(service, /nenhum vínculo visível pela RLS/);
   assert.doesNotMatch(service, /\.(?:insert|update|delete|upsert|rpc)\s*\(/);
   assert.doesNotMatch(service, /(?:console\.(?:log|error)|JSON\.stringify\(usuario)/);
   assert.match(ui, /Diagnosticar vínculo JWT\/RLS \(somente leitura\)/);
@@ -396,4 +396,19 @@ test('Neon vínculo diagnostic invalidates session changes during RLS and never 
   assert.match(service, /if \(perfil\.data && perfil\.data\.user_id !== idInicial\) return invalido\(\)/);
   assert.match(service, /vinculoVisivelPelaRls: false,\s*perfilVisivel: null,\s*consultaSemErro: false/);
   assert.match(service, /return alterouSessao \? invalido\(\) : resultado/);
+});
+
+test('Neon JWT Postgres HML diagnostic reads existing stable identity RPC without exposing UUID', () => {
+  const service = read('src/services/neon/authVinculoDiagnosticHmlService.ts');
+  assert.match(service, /await cliente\.rpc\('usuario_atual_id'\)/);
+  assert.match(service, /jwtPostgresDisponivel: boolean \| null/);
+  assert.match(service, /jwtPostgresCoincideComAuth: boolean \| null/);
+  assert.match(service, /identidadeSql === idInicial/);
+  assert.match(service, /if \(alterouSessao\) return invalido\(\)/);
+  assert.match(service, /const sessaoFinal = await cliente\.auth\.getSession\(\)/);
+  assert.match(service, /const usuarioFinal = await cliente\.auth\.getUser\(\)/);
+  assert.match(service, /Identidade JWT ausente no contexto PostgreSQL/);
+  assert.match(service, /Identidade do JWT PostgreSQL difere da sessão Neon Auth/);
+  assert.match(service, /RPC de identidade PostgreSQL indisponível/);
+  assert.doesNotMatch(service, /console\.(?:log|error)\(/);
 });
