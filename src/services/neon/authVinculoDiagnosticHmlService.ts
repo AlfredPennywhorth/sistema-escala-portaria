@@ -34,7 +34,7 @@ export async function diagnosticarVinculoNeonHml(emailEsperado: string): Promise
   // Se qualquer evento de autenticação ocorrer no intervalo, nenhum resultado
   // sobre privilégios é confiável, mesmo que A -> B -> A termine no mesmo ID.
   let alterouSessao = false;
-  const { data: { subscription } } = cliente.auth.onAuthStateChange(evento => {
+  const { data: { subscription } } = cliente.auth.onAuthStateChange((evento: string) => {
     if (evento !== 'INITIAL_SESSION') alterouSessao = true;
   });
   const invalido = () => ({
