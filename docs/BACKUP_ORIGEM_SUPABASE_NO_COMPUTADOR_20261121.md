@@ -28,6 +28,19 @@ Get-FileHash .\roles.sql, .\schema.sql, .\data.sql -Algorithm SHA256 | Select-Ob
 ```
 Armazene arquivo e hash em local privado criptografado. **Não enviar os dumps para esta conversa, PR pública ou e-mail aberto.**
 
+
+## Validação offline automática dos três dumps (opcional, sem alteração em bancos)
+
+Após exportar os três arquivos, use o script versionado na PR #2 em um computador autorizado com Node.js instalado. Execute **somente** com arquivos guardados em pasta privada. O comando não acessa rede, não faz `pg_restore` e não grava arquivos:
+
+```powershell
+node .\scripts\check-supabase-backup-files.mjs "C:\CAMINHO_PRIVADO\roles.sql" "C:\CAMINHO_PRIVADO\schema.sql" "C:\CAMINHO_PRIVADO\data.sql"
+```
+
+Substitua os caminhos de exemplo por caminhos locais reais, sem copiar credenciais ou dados pessoais. O resultado contém somente nome fixo do arquivo, tamanho e hash SHA-256. `export_files_present: true` atesta apenas a legibilidade e não-vazio dos três arquivos. `restorable` **permanece false por definição**, até que uma restauração em PostgreSQL isolado seja executada, reconciliada e revisada em gate separado.
+
+Não executar o comando na origem, nem publicar hashes junto de dumps ou qualquer relatório que identifique pessoas. Em caso de ausência/arquivo vazio/inacessível, o processo encerra com código não zero. **Este script não substitui o teste de restauração nem a autorização humana de migração.**
+
 ## Escopo e limitações
 - Os três comandos usam a estratégia de dump lógico descrita pela Supabase; o CLI **exclui schemas gerenciados** (p. ex. `auth` e `storage`) no dump padrão. Portanto estes arquivos **não bastam para assegurar portabilidade do Supabase Auth**. Migrar identidades/credenciais para Neon Auth depende de plano próprio, exportação apropriada e reteste de login. Não copiar senhas-hash/dados de `auth.users` diretamente para Neon Auth.
 - Dados reais no inventário da origem em 21/11: 9 auxiliares, 8 rodízios, 380 itens, 8 restrições e 4 vínculos (3 identidades Auth, sendo uma com vínculo duplicado).
