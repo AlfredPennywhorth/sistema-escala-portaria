@@ -420,9 +420,10 @@ async function executarRpcIdentidadeInstrumentada(
             const trimado = texto.trim();
             transporte.corpoVazio = trimado.length === 0;
             transporte.jsonNullLiteral = trimado === 'null';
-          } catch {
+          } catch (erroLeitura) {
             transporte.corpoVazio = null;
             transporte.jsonNullLiteral = null;
+            transporte.erroTransporte = classificarErroTransporte(erroLeitura);
           }
         }
         return resp;

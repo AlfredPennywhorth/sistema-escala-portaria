@@ -344,6 +344,35 @@ test('6. Erro de rede e timeout são distinguidos como inconclusivos sem expor s
   assert.equal(resTimeout.jwtPostgresCoincideComAuth, null);
   assert.match(resTimeout.orientacao, /Falha de rede ou timeout/);
   assertSemDadosSensiveis(resTimeout, ['The operation timed out']);
+
+  // Desconexão após headers HTTP 200 (stream abortado durante resp.text())
+  const mockStreamAbortado = criarClienteSimulado({
+    onRpcBuilder: (_fn, metodo) => criarBuilderPostgrestSimulado({
+      method: metodo,
+      fetchImpl: async () => {
+        const makeBroken = () => ({
+          status: 200,
+          ok: true,
+          statusText: 'OK',
+          async text() {
+            throw new TypeError('terminated');
+          },
+          clone() {
+            return makeBroken();
+          },
+        });
+        return makeBroken();
+      },
+    }),
+  });
+  const resQuebra = await diagnosticarVinculoNeonHml(SECRET_EMAIL, { cliente: mockStreamAbortado.cliente, env: HML_ENV });
+  assert.equal(resQuebra.jwtRpcHttpStatus, 200);
+  assert.equal(resQuebra.jwtRpcCorpoVazio, null);
+  assert.equal(resQuebra.jwtRpcEstado, 'erro_rede');
+  assert.equal(resQuebra.jwtPostgresDisponivel, null);
+  assert.equal(resQuebra.jwtPostgresCoincideComAuth, null);
+  assert.match(resQuebra.orientacao, /Falha de rede ou timeout/);
+  assertSemDadosSensiveis(resQuebra, ['terminated']);
 });
 
 test('7. Sem transporte instrumentável, jwtRpcCorpoVazio permanece null (nunca presumido)', async () => {
