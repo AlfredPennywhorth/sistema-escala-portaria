@@ -374,10 +374,10 @@ test('Neon HML vínculo diagnostic stays read-only and redacts identifiers', () 
   assert.match(service, /\.eq\('user_id', usuario\.data\.user\.id\)/);
   assert.match(service, /\.maybeSingle\(\)/);
   assert.match(service, /nenhum vínculo visível pela RLS/);
-  // Somente a RPC STABLE de identidade é autorizada neste diagnóstico.
+  // Somente a RPC STABLE de identidade é autorizada neste diagnóstico (POST e sonda GET).
   assert.doesNotMatch(service, /\.(?:insert|update|delete|upsert)\s*\(/);
   const rpcs = [...service.matchAll(/\.rpc\s*\(\s*['"]([^'"]+)['"]/g)].map((m) => m[1]);
-  assert.deepEqual(rpcs, ['usuario_atual_id']);
+  assert.ok(rpcs.length >= 1 && rpcs.every((nome) => nome === 'usuario_atual_id'));
   assert.doesNotMatch(service, /(?:console\.(?:log|error)|JSON\.stringify\(usuario)/);
   assert.match(ui, /Diagnosticar vínculo JWT\/RLS \(somente leitura\)/);
   assert.match(ui, /diagnosticarVinculoNeonHml\(email\)/);
@@ -403,9 +403,13 @@ test('Neon vínculo diagnostic invalidates session changes during RLS and never 
 
 test('Neon JWT Postgres HML diagnostic reads existing stable identity RPC without exposing UUID', () => {
   const service = read('src/services/neon/authVinculoDiagnosticHmlService.ts');
-  assert.match(service, /await cliente\.rpc\('usuario_atual_id'\)/);
+  assert.match(service, /cliente\.rpc\('usuario_atual_id'\)/);
+  assert.match(service, /cliente\.rpc\('usuario_atual_id', \{\}, \{ get: true \}\)/);
   assert.match(service, /jwtPostgresDisponivel: boolean \| null/);
   assert.match(service, /jwtPostgresCoincideComAuth: boolean \| null/);
+  assert.match(service, /jwtRpcHttpStatus: number \| null/);
+  assert.match(service, /jwtRpcCorpoVazio: boolean \| null/);
+  assert.match(service, /sessaoEstavelDuranteDiagnostico: boolean/);
   assert.match(service, /identidadeSql === idInicial/);
   assert.match(service, /if \(alterouSessao\) return invalido\(\)/);
   assert.match(service, /const sessaoFinal = await cliente\.auth\.getSession\(\)/);
