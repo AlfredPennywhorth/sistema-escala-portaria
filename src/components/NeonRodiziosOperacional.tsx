@@ -28,7 +28,6 @@ import {
   FileText,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
-import { useAuth } from '../hooks/useAuth';
 import { NeonRelatorioRodizio } from './NeonRelatorioRodizio';
 import {
   listarRodiziosAdministrativosNeonHml,
@@ -52,7 +51,6 @@ interface EstadoOperacional {
 }
 
 export function NeonRodiziosOperacional() {
-  const { usuario, isAdmin, loading: loadingAuth } = useAuth();
   const [estado, setEstado] = useState<EstadoOperacional>({
     vista: 'lista',
     rodizios: [],
@@ -66,10 +64,8 @@ export function NeonRodiziosOperacional() {
 
   // Carregar rodízios ao montar
   useEffect(() => {
-    if (!loadingAuth) {
-      carregarRodizios();
-    }
-  }, [loadingAuth]);
+    void carregarRodizios();
+  }, []);
 
   /**
    * Carregar lista de rodízios do Neon (somente leitura admin)
@@ -100,7 +96,7 @@ export function NeonRodiziosOperacional() {
   /**
    * Carregar detalhes e itens de um rodízio
    */
-  async function abrirDetalhes(rodizio: RodizioNeonVersionado) {
+  async function abrirDetalhes(rodizio: RodizioNeonVersionado, destino: 'detalhes' | 'editor' = 'detalhes') {
     setEstado((prev) => ({
       ...prev,
       carregando: true,
@@ -127,7 +123,7 @@ export function NeonRodiziosOperacional() {
           auxiliar_id: item.auxiliar_id,
           observacoes: item.observacoes,
         })),
-        vista: 'detalhes',
+        vista: destino,
         carregando: false,
       }));
     }
@@ -149,7 +145,7 @@ export function NeonRodiziosOperacional() {
    * Abrir editor para editar rodízio existente
    */
   function abrirEditorExistente(rodizio: RodizioNeonVersionado) {
-    abrirDetalhes(rodizio);
+    void abrirDetalhes(rodizio, 'editor');
   }
 
   /**
@@ -174,9 +170,7 @@ export function NeonRodiziosOperacional() {
       ...prev,
       sucesso: mensagem,
     }));
-    setTimeout(() => {
-      fecharEditor();
-    }, 2000);
+    fecharEditor();
   }
 
   /**
@@ -192,31 +186,6 @@ export function NeonRodiziosOperacional() {
   // =========================================================================
   // Renderização
   // =========================================================================
-
-  if (loadingAuth || !usuario) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-        <div className="bg-white rounded-lg shadow-xl p-8 text-center">
-          <div className="w-12 h-12 border-3 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-slate-600">Verificando permissões...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!isAdmin) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-        <div className="bg-white rounded-lg shadow-xl p-8 text-center max-w-md">
-          <AlertCircle size={48} className="text-red-600 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-slate-900 mb-2">Acesso Restrito</h2>
-          <p className="text-slate-600">
-            Apenas administradores podem acessar o gerenciador operacional de rodízios.
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   // Vista: Editor
   if (estado.vista === 'editor') {
