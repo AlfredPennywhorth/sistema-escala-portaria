@@ -14,8 +14,14 @@ async function transicaoVersionadaHml(
   rodizioId: string,
   revisaoOriginal: number,
 ): Promise<ServiceResult<number>> {
-  if (import.meta.env.VITE_NEON_HOMOLOGACAO_ENABLED !== 'true') {
-    return { data: null, error: 'Transições Neon permitidas somente em homologação.' };
+  // Escrita habilitada exclusivamente em build autorizada da branch descartável.
+  const authEndpoint = 'https://ep-nameless-dust-b6271958.neonauth.c-2.sa-east-1.aws.neon.tech/rodizio_portas/auth';
+  const dataEndpoint = 'https://ep-nameless-dust-b6271958.apirest.c-2.sa-east-1.aws.neon.tech/rodizio_portas/rest/v1';
+  if (import.meta.env.VITE_NEON_HOMOLOGACAO_ENABLED !== 'true' ||
+      import.meta.env.VITE_NEON_SQL06_ENABLED !== 'true' ||
+      import.meta.env.VITE_NEON_AUTH_URL !== authEndpoint ||
+      import.meta.env.VITE_NEON_DATA_API_URL !== dataEndpoint) {
+    return { data: null, error: 'Transição bloqueada: autorização e branch descartável não confirmadas.' };
   }
   if (!UUID.test(rodizioId) || !Number.isSafeInteger(revisaoOriginal) ||
       revisaoOriginal < 0 || revisaoOriginal >= Number.MAX_SAFE_INTEGER) {
