@@ -20,8 +20,8 @@ import {
   travarRodizioVersionadoNeonHml,
 } from './rodizioStatusVersionedHmlService';
 import {
-  substituirItensRascunhoVersionadosNeonHml,
-} from './rodizioDraftVersionedWriteService';
+  salvarRascunhoAtomicoNeonHml,
+} from './rodizioFunctionalHmlService';
 
 /**
  * Entrada para criação de um novo rascunho.
@@ -145,7 +145,7 @@ export async function atualizarCabecalhoNeonEditor(
 export async function substituirItensNeonEditor(
   entrada: SubstituicaoItensNeon,
 ): Promise<ResultadoComRevisao<number>> {
-  const result = await substituirItensRascunhoVersionadosNeonHml(
+  const result = await salvarRascunhoAtomicoNeonHml(
     entrada.rodizioId,
     entrada.itens,
     entrada.revisaoOriginal,
@@ -154,7 +154,7 @@ export async function substituirItensNeonEditor(
     return { data: null, error: result.error };
   }
   return {
-    data: result.data,
+    data: result.data.itens.length,
     error: null,
     novaRevisao: entrada.revisaoOriginal + 1,
   };
