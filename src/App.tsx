@@ -13,6 +13,7 @@ import { NeonRpcBranchHomologacao } from './components/NeonRpcBranchHomologacao'
 import { NeonOperacionalHml } from './components/NeonOperacionalHml';
 import { NeonAreaAuxiliarHml } from './components/NeonAreaAuxiliarHml';
 import { NeonRodiziosOperacional } from './components/NeonRodiziosOperacional';
+import { NeonP2CadastrosReadOnly } from './components/NeonP2CadastrosReadOnly';
 
 function AppPrincipal() {
   const { loading } = useAuth();
@@ -79,6 +80,11 @@ export function App() {
         new URLSearchParams(window.location.search).get('editor-rodizios-neon') === '1') {
       // Tela operacional com as 7 operações de editor de rodízios (P0)
       return <NeonRodiziosOperacional />;
+    }
+    if (hostnameHml &&
+        new URLSearchParams(window.location.search).get('p2-cadastros-neon') === '1') {
+      // P2: Consulta de auxiliares e restrições (somente leitura, mutações bloqueadas)
+      return <NeonP2CadastrosReadOnly />;
     }
     if (hostnameHml &&
         new URLSearchParams(window.location.search).get('operacional-neon') === '1') {
