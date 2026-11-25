@@ -4,7 +4,7 @@ import type { ServiceResult } from '../../types/supabase';
 // SQL 06: propostas não instaladas na branch Neon. Estes adaptadores
 // não são consumidos pela interface operacional e falham fora da HML.
 // Não implementar fallback DML ou repetição automática após erro de rede.
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DATA = /^\d{4}-\d{2}-\d{2}$/;
 const SEM_RESPOSTA = 'Resultado indeterminado. Conferir estado e revisão no banco antes de repetir; nenhuma repetição automática.';
 
