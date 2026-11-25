@@ -13,6 +13,8 @@ if (process.env.CF_PAGES_BRANCH !== requiredBranch) {
 const env = {
   ...process.env,
   VITE_NEON_HOMOLOGACAO_ENABLED: 'true',
+  // O build padrão jamais habilita adaptadores de mutação, mesmo com variável herdada.
+  VITE_NEON_SQL06_ENABLED: 'false',
   VITE_NEON_AUTH_URL: 'https://ep-purple-water-b6agr3hn.neonauth.c-2.sa-east-1.aws.neon.tech/rodizio_portas/auth',
   VITE_NEON_DATA_API_URL: 'https://ep-purple-water-b6agr3hn.apirest.c-2.sa-east-1.aws.neon.tech/rodizio_portas/rest/v1',
   // O app legado importa o cliente Supabase, embora o modo de homologação não o utilize.
