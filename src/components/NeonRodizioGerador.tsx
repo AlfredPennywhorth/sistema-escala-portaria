@@ -66,7 +66,7 @@ export function NeonRodizioGerador({
         }))
       );
 
-      onGerado?.(itensEditando, resultado);
+      // A transferência é explícita, após revisão local da sugestão.
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Erro desconhecido na geração';
       setErro(msg);
@@ -313,6 +313,11 @@ export function NeonRodizioGerador({
           </table>
         </div>
 
+        <button type="button" disabled={!onGerado || itensEditando.length === 0}
+          className="mt-4 rounded bg-blue-700 px-4 py-2 text-white disabled:opacity-50"
+          onClick={() => onGerado?.(itensEditando.map(item => ({ ...item })), sugestao)}>
+          Aplicar itens revisados ao editor (sem gravar)
+        </button>
         {itensEditando.length === 0 && (
           <div className="text-center py-8 text-slate-500">Nenhum item adicionado</div>
         )}
