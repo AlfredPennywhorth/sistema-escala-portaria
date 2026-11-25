@@ -14,7 +14,7 @@
  * Trata conflitos OCC, falhas de autorização, timeout e respostas indeterminadas.
  */
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Save, X, AlertCircle, Check, Lock, Trash2, Send, ChevronDown, Zap } from 'lucide-react';
 import type { RodizioNeonVersionado, RodizioItemInput } from '../types/supabase';
 import {
@@ -69,7 +69,14 @@ export function NeonRodizioEditor({
   const [novaRevisao, setNovaRevisao] = useState<number | null>(null);
 
   // Revisão original capturada ao abrir o editor
-  const revisaoOriginal = rodizio?.revisao ?? 0;
+  const [revisaoOriginal] = useState(() => {
+    const valor = rodizio?.revisao;
+    if (typeof valor !== 'number' && (typeof valor !== 'string' || !/^\d+$/.test(valor))) return Number.NaN;
+    const numero = Number(valor);
+    return Number.isSafeInteger(numero) && numero >= 0 && numero < Number.MAX_SAFE_INTEGER ? numero : Number.NaN;
+  });
+  const bloqueioOperacao = useRef(false);
+  const [reconciliar, setReconciliar] = useState(false);
 
   // =========================================================================
   // Gestão de itens
@@ -103,6 +110,12 @@ export function NeonRodizioEditor({
     nome: string,
     operacao: () => Promise<{ data: T | null; error: string | null; novaRevisao?: number }>,
   ) {
+    if (bloqueioOperacao.current || reconciliar) return;
+    if (rodizio && !Number.isSafeInteger(revisaoOriginal)) {
+      setErro('Revisão original indisponível. Reabra a escala.');
+      return;
+    }
+    bloqueioOperacao.current = true;
     setErro(null);
     setSucesso(null);
     setEmOperacao(true);
@@ -111,19 +124,23 @@ export function NeonRodizioEditor({
     try {
       const resultado = await operacao();
       if (resultado.error) {
-        setErro(resultado.error);
+        setReconciliar(true);
+        setErro(resultado.error + ' Feche e reabra a escala antes de nova tentativa.');
         onErro?.(resultado.error);
       } else {
+        setReconciliar(true);
         const msg = `Operação "${nome}" concluída com sucesso!`;
         setSucesso(msg);
         setNovaRevisao(resultado.novaRevisao ?? null);
         onSucesso?.(msg, resultado.novaRevisao);
       }
     } catch (err) {
+      setReconciliar(true);
       const msg = `Erro inesperado em "${nome}": ${err instanceof Error ? err.message : String(err)}`;
       setErro(msg);
       onErro?.(msg);
     } finally {
+      bloqueioOperacao.current = false;
       setEmOperacao(false);
       setOperacaoAtual(null);
     }
@@ -302,7 +319,7 @@ export function NeonRodizioEditor({
             <h2 className="text-xl font-bold">Editor de Rodízio Neon</h2>
             {rodizio && (
               <p className="text-sm text-blue-100 mt-1">
-                ID: {rodizio.id.substring(0, 8)}... | Revisão: {novaRevisao ?? revisaoOriginal}
+                ID: {rodizio.id.substring(0, 8)}... | Revisão: {novaRevisao ?? (Number.isSafeInteger(revisaoOriginal) ? revisaoOriginal : 'indisponível')}
               </p>
             )}
           </div>
@@ -405,7 +422,7 @@ export function NeonRodizioEditor({
                   type="text"
                   value={titulo}
                   onChange={(e) => setTitulo(e.target.value)}
-                  disabled={emOperacao}
+                  disabled={emOperacao || reconciliar}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-slate-100"
                 />
               </div>
@@ -419,7 +436,7 @@ export function NeonRodizioEditor({
                     type="date"
                     value={dataInicio}
                     onChange={(e) => setDataInicio(e.target.value)}
-                    disabled={emOperacao}
+                    disabled={emOperacao || reconciliar}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-slate-100"
                   />
                 </div>
@@ -431,7 +448,7 @@ export function NeonRodizioEditor({
                     type="date"
                     value={dataFim}
                     onChange={(e) => setDataFim(e.target.value)}
-                    disabled={emOperacao}
+                    disabled={emOperacao || reconciliar}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-slate-100"
                   />
                 </div>
@@ -444,7 +461,7 @@ export function NeonRodizioEditor({
                 <textarea
                   value={observacoes}
                   onChange={(e) => setObservacoes(e.target.value)}
-                  disabled={emOperacao}
+                  disabled={emOperacao || reconciliar}
                   rows={3}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-slate-100"
                 />
@@ -453,7 +470,7 @@ export function NeonRodizioEditor({
               {rodizio && (
                 <button
                   onClick={handleAtualizarCabecalho}
-                  disabled={emOperacao}
+                  disabled={emOperacao || reconciliar}
                   className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-slate-400 flex items-center justify-center gap-2 transition"
                 >
                   <Save size={18} />
@@ -464,7 +481,7 @@ export function NeonRodizioEditor({
               {!rodizio && (
                 <button
                   onClick={handleCriarRascunho}
-                  disabled={emOperacao}
+                  disabled={emOperacao || reconciliar}
                   className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-slate-400 flex items-center justify-center gap-2 transition"
                 >
                   <Send size={18} />
@@ -481,7 +498,7 @@ export function NeonRodizioEditor({
                 <h3 className="text-lg font-semibold text-slate-900">Itens da Escala</h3>
                 <button
                   onClick={adicionarItem}
-                  disabled={emOperacao}
+                  disabled={emOperacao || reconciliar}
                   className="px-3 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 disabled:opacity-50 text-sm"
                 >
                   + Adicionar Item
@@ -511,14 +528,14 @@ export function NeonRodizioEditor({
                       <div className="flex gap-2">
                         <button
                           onClick={() => editarItem(idx)}
-                          disabled={emOperacao}
+                          disabled={emOperacao || reconciliar}
                           className="px-2 py-1 text-xs bg-slate-200 rounded hover:bg-slate-300 disabled:opacity-50"
                         >
                           Editar
                         </button>
                         <button
                           onClick={() => removerItem(idx)}
-                          disabled={emOperacao}
+                          disabled={emOperacao || reconciliar}
                           className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 disabled:opacity-50"
                         >
                           Remover
@@ -531,7 +548,7 @@ export function NeonRodizioEditor({
 
               <button
                 onClick={handleSubstituirItens}
-                disabled={emOperacao || itens.length === 0}
+                disabled={emOperacao || reconciliar || itens.length === 0}
                 className="w-full mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-slate-400 flex items-center justify-center gap-2 transition"
               >
                 <Save size={18} />
@@ -547,7 +564,7 @@ export function NeonRodizioEditor({
               <div className="grid grid-cols-2 gap-3">
                 <button
                   onClick={handlePublicar}
-                  disabled={emOperacao || rodizio.status !== 'rascunho'}
+                  disabled={emOperacao || reconciliar || rodizio.status !== 'rascunho'}
                   className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-slate-400 flex items-center justify-center gap-2 transition text-sm"
                 >
                   <Send size={16} />
@@ -556,7 +573,7 @@ export function NeonRodizioEditor({
 
                 <button
                   onClick={handleTravar}
-                  disabled={emOperacao || rodizio.status === 'travado'}
+                  disabled={emOperacao || reconciliar || rodizio.status === 'travado'}
                   className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 disabled:bg-slate-400 flex items-center justify-center gap-2 transition text-sm"
                 >
                   <Lock size={16} />
@@ -565,7 +582,7 @@ export function NeonRodizioEditor({
 
                 <button
                   onClick={handleCancelar}
-                  disabled={emOperacao || rodizio.status === 'cancelado'}
+                  disabled={emOperacao || reconciliar || rodizio.status === 'cancelado'}
                   className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:bg-slate-400 flex items-center justify-center gap-2 transition text-sm"
                 >
                   <AlertCircle size={16} />
@@ -574,7 +591,7 @@ export function NeonRodizioEditor({
 
                 <button
                   onClick={handleExcluirRascunho}
-                  disabled={emOperacao || rodizio.status !== 'rascunho'}
+                  disabled={emOperacao || reconciliar || rodizio.status !== 'rascunho'}
                   className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-slate-400 flex items-center justify-center gap-2 transition text-sm"
                 >
                   <Trash2 size={16} />
