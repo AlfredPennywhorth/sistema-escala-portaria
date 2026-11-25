@@ -52,3 +52,17 @@ Executar manualmente apenas: segundo login Admin e um fluxo E2E representativo; 
 - Codex respondeu também à revisão incremental do HEAD `128bf1945b`: **`Didn't find any major issues`** (issuecomment 7070703138, 20h11 BRT). Confirmar sempre o SHA ao interpretar o review; a aprovação de commit anterior não valida alterações posteriores.
 - CI e Codex sem achados críticos **não** liberam a produção, nem substituem revisão específica das mudanças de grants/RLS/RPC, ainda não feitas.
 - A migração de dados reais continua NO-GO até backup restaurável, mapa das 3 identidades, ordem de importação dos 7 rodízios travados, fechamento de bypass DML/RPC, homologação operacional Neon e aprovação explícita.
+
+
+## Atualização de homologação — 25/11/2026 (três contas disponíveis)
+
+**Escopo:** evidências manuais da HML Neon isolada. Esta seção atualiza a disponibilidade real de contas e o estado dos testes; não modifica o significado dos gates anteriores nem autoriza publicação.
+
+- **Contas efetivamente disponíveis:** 1 Administrador, 1 Coordenadora e 1 Auxiliar. Não existe segundo Administrador criado/homologado nesta etapa. Referências históricas acima à promoção da Coordenadora e ao teste de dois Administradores são planos antigos, não comprovação de execução.
+- **Administrador (uma identidade):** 3 diagnósticos consecutivos com sessão estável, identidade JWT/PostgreSQL coincidente e RPC GET/POST HTTP 200 com identidade válida; 3 escalas visíveis; leitura de 2 auxiliares, rodízio publicado (3 itens) e rascunho (1 item).
+- **Coordenadora (uma identidade):** 4 diagnósticos consecutivos posteriores com GET/POST válidos e sessão estável. Ocorrências anteriores alternaram `identidade_valida` e `sql_null`; a causa raiz da intermitência continua **não determinada**.
+- **Auxiliar (uma identidade):** 2 diagnósticos válidos; 2 escalas visíveis; somente o próprio cadastro (1 auxiliar) e rodízio publicado (3 itens), sem rascunho ou itens de rascunho visíveis na amostra.
+- **Limites da evidência:** restrições retornaram zero para Auxiliar e Admin, portanto a ausência de fixture não comprova negativa RLS; o teste de leitura não valida negativas de escrita. O encerramento de sessão apresentou `Invalid origin` e não está homologado.
+- **`jwt_two_admins_verified`: PENDENTE.** Uma conta Admin validada não equivale a duas identidades administrativas independentes. Não marcar `verified: true` nem alterar o verificador para dispensar essa exigência sem decisão explícita, avaliação de riscos e evidências substitutivas aprovadas.
+- **Próxima trilha segura:** preparar a matriz de testes de negativas de acesso com fixtures controladas e testes automatizados isolados; investigar logout e RPC intermitente. Sem executar DML/DDL/GRANT/REVOKE ou testes de escrita na branch Neon atual sem autorização específica.
+- **NO-GO permanece:** backup restaurável, mapeamento/reconciliação, fechamento de DML/RPC legada, OCC/histórico, UI operacional Neon E2E, rollback, estabilidade e gates de produção ainda não foram comprovados integralmente.
