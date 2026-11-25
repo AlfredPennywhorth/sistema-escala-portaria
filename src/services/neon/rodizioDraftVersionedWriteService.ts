@@ -14,8 +14,14 @@ export async function substituirItensRascunhoVersionadosNeonHml(
   itens: RodizioItemInput[],
   revisaoEsperada: number,
 ): Promise<ServiceResult<number>> {
-  if (import.meta.env.VITE_NEON_HOMOLOGACAO_ENABLED !== 'true') {
-    return { data: null, error: 'Gravação versionada permitida somente em homologação Neon.' };
+  // Escrita habilitada exclusivamente em build autorizada da branch descartável.
+  const authEndpoint = 'https://ep-nameless-dust-b6271958.neonauth.c-2.sa-east-1.aws.neon.tech/rodizio_portas/auth';
+  const dataEndpoint = 'https://ep-nameless-dust-b6271958.apirest.c-2.sa-east-1.aws.neon.tech/rodizio_portas/rest/v1';
+  if (import.meta.env.VITE_NEON_HOMOLOGACAO_ENABLED !== 'true' ||
+      import.meta.env.VITE_NEON_SQL06_ENABLED !== 'true' ||
+      import.meta.env.VITE_NEON_AUTH_URL !== authEndpoint ||
+      import.meta.env.VITE_NEON_DATA_API_URL !== dataEndpoint) {
+    return { data: null, error: 'Gravação bloqueada: autorização e branch descartável não confirmadas.' };
   }
   if (!UUID.test(rodizioId)) {
     return { data: null, error: 'ID da escala inválido.' };
