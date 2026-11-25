@@ -4,17 +4,8 @@ on:
     paths:
       - 'src/**'
       - 'migration/neon/**'
-      - 'tests/neon-contracts.test.mjs'
-      - 'tests/neon-vinculo-diagnostic.test.mjs'
-      - 'tests/neon-release-gates.test.mjs'
-      - 'tests/neon-backup-files.test.mjs'
+      - 'tests/neon-*.test.mjs'
       - 'scripts/check-supabase-backup-files.mjs'
-      - 'tests/neon-data-inventory.test.mjs'
-      - 'tests/neon-schema-compat.test.mjs'
-      - 'tests/neon-identity-reconciliation.test.mjs'
-      - 'tests/neon-write-surface-full.test.mjs'
-      - 'tests/neon-write-hardening-proposal.test.mjs'
-      - 'tests/neon-sql04-revision-order.test.mjs'
       - 'scripts/check-neon-release-gates.mjs'
       - 'package.json'
       - 'tsconfig*.json'
@@ -54,25 +45,7 @@ jobs:
         env:
           CF_PAGES: '1'
           CF_PAGES_BRANCH: chore/neon-migration-prep-20261115
-      - name: Check Neon OCC and authorization contracts (static, offline)
-        run: node --test tests/neon-contracts.test.mjs
-      - name: Validate Neon HML JWT/RLS diagnostic behavior (mocked, offline)
-        run: node --test tests/neon-vinculo-diagnostic.test.mjs
-      - name: Validate backup file verifier (offline fixtures only)
-        run: node --test tests/neon-backup-files.test.mjs
-      - name: Validate production Go/No-Go checks (offline)
-        run: node --test tests/neon-release-gates.test.mjs
-      - name: Validate source/destination read-only inventory (offline)
-        run: node --test tests/neon-data-inventory.test.mjs
-      - name: Validate schema compatibility preflight (offline)
-        run: node --test tests/neon-schema-compat.test.mjs
-      - name: Validate identity deduplication preflight (offline)
-        run: node --test tests/neon-identity-reconciliation.test.mjs
-      - name: Validate complete write surface audit (offline)
-        run: node --test tests/neon-write-surface-full.test.mjs
-      - name: Validate write hardening proposal (offline, never executes SQL)
-        run: node --test tests/neon-write-hardening-proposal.test.mjs
-      - name: Validate SQL04 revision-first repair (offline, no SQL execution)
-        run: node --test tests/neon-sql04-revision-order.test.mjs
+      - name: Validate all Neon contracts and regressions (offline)
+        run: node --test tests/neon-*.test.mjs
       - name: ESLint
         run: npm run lint
