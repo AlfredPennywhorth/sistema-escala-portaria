@@ -25,9 +25,11 @@ import {
   Lock,
   Send,
   Zap,
+  FileText,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { useAuth } from '../hooks/useAuth';
+import { NeonRelatorioRodizio } from './NeonRelatorioRodizio';
 import {
   listarRodiziosAdministrativosNeonHml,
   obterRodizioComItensNeonHml,
@@ -43,6 +45,7 @@ interface EstadoOperacional {
   rodizios: RodizioNeonVersionado[];
   rodizioSelecionado: RodizioNeonVersionado | null;
   itens: RodizioItemInput[];
+  relatorioRodizioId: string | null;
   carregando: boolean;
   erro: string | null;
   sucesso: string | null;
@@ -55,6 +58,7 @@ export function NeonRodiziosOperacional() {
     rodizios: [],
     rodizioSelecionado: null,
     itens: [],
+    relatorioRodizioId: null,
     carregando: true,
     erro: null,
     sucesso: null,
@@ -325,6 +329,17 @@ export function NeonRodiziosOperacional() {
                   <Edit size={18} />
                   Editar
                 </button>
+                <button
+                  onClick={() => {
+                    if (estado.rodizioSelecionado) {
+                      setEstado((prev) => ({ ...prev, relatorioRodizioId: estado.rodizioSelecionado?.id ?? null }));
+                    }
+                  }}
+                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center gap-2 transition"
+                >
+                  <FileText size={18} />
+                  Relatório
+                </button>
               </div>
             </div>
 
@@ -594,6 +609,14 @@ export function NeonRodiziosOperacional() {
           </p>
         </div>
       </div>
+
+      {/* Relatório modal */}
+      {estado.relatorioRodizioId && (
+        <NeonRelatorioRodizio
+          rodizioId={estado.relatorioRodizioId}
+          onFechar={() => setEstado((prev) => ({ ...prev, relatorioRodizioId: null }))}
+        />
+      )}
     </div>
   );
 }
