@@ -59,6 +59,12 @@ export function NeonAuthHomologacao() {
         >
           Abrir prévia operacional Neon (somente leitura, exige Admin)
         </a>
+        <a
+          className="mt-3 ml-2 inline-block rounded-md border border-blue-600 px-4 py-2 text-sm font-medium text-blue-800"
+          href="?minhas-datas-neon=1"
+        >
+          Abrir minhas datas Neon (somente leitura, exige Auxiliar)
+        </a>
         <form
           className="mt-5 space-y-3"
           onSubmit={(e) => {
