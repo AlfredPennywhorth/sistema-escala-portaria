@@ -24,6 +24,7 @@ import {
   Edit,
   Lock,
   Send,
+  Zap,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { useAuth } from '../hooks/useAuth';
@@ -32,9 +33,10 @@ import {
   obterRodizioComItensNeonHml,
 } from '../services/neon/rodizioFunctionalHmlService';
 import { NeonRodizioEditor } from './NeonRodizioEditor';
+import { NeonRodizioGerador } from './NeonRodizioGerador';
 import type { RodizioNeonVersionado, RodizioItemInput } from '../types/supabase';
 
-type VistaAtual = 'lista' | 'detalhes' | 'editor';
+type VistaAtual = 'lista' | 'detalhes' | 'editor' | 'gerar';
 
 interface EstadoOperacional {
   vista: VistaAtual;
@@ -225,6 +227,67 @@ export function NeonRodiziosOperacional() {
     );
   }
 
+  // Vista: Gerar
+  if (estado.vista === 'gerar' && estado.rodizioSelecionado) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-yellow-50 to-amber-100 p-4">
+        <div className="max-w-6xl mx-auto">
+          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <button
+                onClick={() => setEstado((prev) => ({ ...prev, vista: 'detalhes' }))}
+                className="px-4 py-2 text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200 transition"
+              >
+                ← Voltar
+              </button>
+            </div>
+
+            <h1 className="text-3xl font-bold text-slate-900 mb-2">
+              Gerar Escala: {estado.rodizioSelecionado.titulo}
+            </h1>
+
+            <p className="text-sm text-slate-600 mb-6">
+              Período: {format(parseISO(estado.rodizioSelecionado.data_inicio), 'dd/MM/yyyy')} até{' '}
+              {format(parseISO(estado.rodizioSelecionado.data_fim), 'dd/MM/yyyy')}
+            </p>
+
+            {estado.erro && (
+              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex gap-3">
+                <AlertCircle size={20} className="text-red-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-red-900">Erro</p>
+                  <p className="text-sm text-red-700 mt-1">{estado.erro}</p>
+                </div>
+              </div>
+            )}
+
+            <NeonRodizioGerador
+              dadosGeração={{
+                rodizio: estado.rodizioSelecionado,
+                auxiliares: [],
+                restricoes: [],
+                historicoTravado: [],
+              }}
+              onGerado={(itens) => {
+                setEstado((prev) => ({
+                  ...prev,
+                  itens,
+                  vista: 'editor',
+                }));
+              }}
+              onErro={(msg) => {
+                setEstado((prev) => ({
+                  ...prev,
+                  erro: msg,
+                }));
+              }}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Vista: Detalhes
   if (estado.vista === 'detalhes' && estado.rodizioSelecionado) {
     return (
@@ -239,17 +302,30 @@ export function NeonRodiziosOperacional() {
               >
                 ← Voltar
               </button>
-              <button
-                onClick={() => {
-                  if (estado.rodizioSelecionado) {
-                    abrirEditorExistente(estado.rodizioSelecionado);
-                  }
-                }}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 transition"
-              >
-                <Edit size={18} />
-                Editar
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    if (estado.rodizioSelecionado) {
+                      setEstado((prev) => ({ ...prev, vista: 'gerar' }));
+                    }
+                  }}
+                  className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 flex items-center gap-2 transition"
+                >
+                  <Zap size={18} />
+                  Gerar
+                </button>
+                <button
+                  onClick={() => {
+                    if (estado.rodizioSelecionado) {
+                      abrirEditorExistente(estado.rodizioSelecionado);
+                    }
+                  }}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 transition"
+                >
+                  <Edit size={18} />
+                  Editar
+                </button>
+              </div>
             </div>
 
             <h1 className="text-3xl font-bold text-slate-900 mb-2">

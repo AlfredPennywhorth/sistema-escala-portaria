@@ -15,7 +15,7 @@
  */
 
 import { useState } from 'react';
-import { Save, X, AlertCircle, Check, Lock, Trash2, Send, ChevronDown } from 'lucide-react';
+import { Save, X, AlertCircle, Check, Lock, Trash2, Send, ChevronDown, Zap } from 'lucide-react';
 import type { RodizioNeonVersionado, RodizioItemInput } from '../types/supabase';
 import {
   criarRascunhoNeonEditor,
@@ -32,6 +32,7 @@ import {
   type CancelamentoNeon,
   type ExclusaoRascunhoNeon,
 } from '../services/neon/rodizioEditorNeonService';
+import { NeonRodizioGerador } from './NeonRodizioGerador';
 
 interface NeonRodizioEditorProps {
   rodizio: RodizioNeonVersionado | null;
@@ -48,6 +49,9 @@ export function NeonRodizioEditor({
   onSucesso,
   onErro,
 }: NeonRodizioEditorProps) {
+  // Estado da vista (edição ou geração)
+  const [vista, setVista] = useState<'editar' | 'gerar'>('editar');
+
   // Estado local do editor
   const [titulo, setTitulo] = useState(rodizio?.titulo ?? '');
   const [dataInicio, setDataInicio] = useState(rodizio?.data_inicio ?? '');
@@ -311,6 +315,31 @@ export function NeonRodizioEditor({
           </button>
         </div>
 
+        {/* Tabs */}
+        <div className="border-b border-slate-200 flex gap-0 bg-slate-50">
+          <button
+            onClick={() => setVista('editar')}
+            className={`flex-1 py-3 px-6 font-medium text-sm border-b-2 transition ${
+              vista === 'editar'
+                ? 'border-blue-600 text-blue-600 bg-white'
+                : 'border-transparent text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            Editar
+          </button>
+          <button
+            onClick={() => setVista('gerar')}
+            className={`flex-1 py-3 px-6 font-medium text-sm border-b-2 transition flex items-center justify-center gap-2 ${
+              vista === 'gerar'
+                ? 'border-yellow-600 text-yellow-600 bg-white'
+                : 'border-transparent text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Zap size={18} />
+            Gerar
+          </button>
+        </div>
+
         {/* Alertas */}
         {erro && (
           <div className="bg-red-50 border-l-4 border-red-500 p-4 m-4">
@@ -338,6 +367,29 @@ export function NeonRodizioEditor({
 
         {/* Conteúdo */}
         <div className="p-6 space-y-6">
+          {/* Vista: Gerar */}
+          {vista === 'gerar' && rodizio && (
+            <NeonRodizioGerador
+              dadosGeração={{
+                rodizio,
+                auxiliares: [],
+                restricoes: [],
+                historicoTravado: [],
+              }}
+              onGerado={(itensGerados) => {
+                setItens(itensGerados);
+                setVista('editar');
+                setSucesso('Itens gerados com sucesso! Agora é possível editar antes de salvar.');
+              }}
+              onErro={(msg) => {
+                setErro(msg);
+              }}
+            />
+          )}
+
+          {/* Vista: Editar */}
+          {vista === 'editar' && (
+            <>
           {/* Seção: Cabeçalho */}
           <section>
             <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
@@ -530,6 +582,8 @@ export function NeonRodizioEditor({
                 </button>
               </div>
             </section>
+          )}
+            </>
           )}
         </div>
 
