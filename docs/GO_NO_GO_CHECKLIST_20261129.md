@@ -66,3 +66,33 @@ Executar manualmente apenas: segundo login Admin e um fluxo E2E representativo; 
 - **`jwt_two_admins_verified`: PENDENTE.** Uma conta Admin validada não equivale a duas identidades administrativas independentes. Não marcar `verified: true` nem alterar o verificador para dispensar essa exigência sem decisão explícita, avaliação de riscos e evidências substitutivas aprovadas.
 - **Próxima trilha segura:** preparar a matriz de testes de negativas de acesso com fixtures controladas e testes automatizados isolados; investigar logout e RPC intermitente. Sem executar DML/DDL/GRANT/REVOKE ou testes de escrita na branch Neon atual sem autorização específica.
 - **NO-GO permanece:** backup restaurável, mapeamento/reconciliação, fechamento de DML/RPC legada, OCC/histórico, UI operacional Neon E2E, rollback, estabilidade e gates de produção ainda não foram comprovados integralmente.
+
+
+## Plano de verificação negativa RLS e logout — 25/11/2026 (sem executar escrita)
+
+### Logout e origens autorizadas
+- Catálogo real do Neon Auth da branch `br-late-night-b6pydxvn`: `trusted_origins` contém somente `https://rodizio-portaria-neon-hml.pages.dev`. Não confundir origem de hospedagem com a URL da API Auth.
+- A mensagem `Invalid origin` foi observada após tentativa de logout. Não há evidência registrada da URL/origem exata da aba nesse incidente: uma implantação temporária `https://<hash>.rodizio-portaria-neon-hml.pages.dev` sem cadastro é **hipótese**, não causa confirmada.
+- O frontend já verifica a sessão depois de `signOut()` e não aprova saída se a identidade permanece válida. Preservar esse comportamento.
+- **Teste manual futuro, sem troca de configuração:** usar exclusivamente a origem canônica autorizada, registrar se o logout retorna erro e confirmar, após atualizar, que uma leitura autenticada deixa de funcionar. Não reutilizar OTP nem mudar conta durante este teste. Se o erro persistir na origem canônica, coletar apenas status e classificação seguros, sem tokens, cookies, e-mails, URLs com códigos ou identificadores.
+- Não adicionar wildcard de preview nem alterar origens confiáveis para contornar a falha. Mudanças de Auth exigem proposta e autorização específica.
+
+### Matriz de validação RLS em HML isolada
+| Perfil | Cenário | Estado na amostra | Evidência que falta |
+| --- | --- | --- | --- |
+| Auxiliar | SELECT de próprio cadastro | Observado: 1 visível | Negativa de acesso a outro cadastro conhecido, por consulta filtrada somente leitura |
+| Auxiliar | SELECT de escala publicada e itens | Observado: publicado e 3 itens | Comprovar visibilidade nos limites previstos |
+| Auxiliar | SELECT de rascunho e itens | Observado: 0 resultados para fixture identificada | Verificar que a fixture existe com sessão Admin, preservando consulta por ID fixo e RLS |
+| Auxiliar | SELECT de restrição existente | **Não comprovado**: 0 registros sem fixture | Preparar fixture fictícia isolada; validar sua existência por Admin e invisibilidade pela Auxiliar |
+| Auxiliar | INSERT/UPDATE/DELETE negados | **Não comprovado** | Ensaiar exclusivamente em ambiente descartável especificamente autorizado, com estado inicial/final reconciliado |
+| Coordenadora | Leitura compatível com perfil | Identidade validada, leitura funcional ainda incompleta | Testes SELECT com fixtures existentes e negativas cruzadas |
+| Administrador | SELECT de rascunho e itens | Observado: rascunho + 1 item | Confirmar que a fixture é a mesma referenciada no teste da Auxiliar |
+| Administrador | Escrita versionada, OCC e travamento | **Não comprovado neste ciclo** | Ensaiar com RPCs revisadas em branch descartável autorizada, sem acesso DML direto |
+| Todos | RPC JWT GET/POST | Observado válido nas amostras recentes | Manter registro da intermitência `sql_null`; monitorar sem liberar escrita |
+| Todos | Encerramento de sessão | Falha `Invalid origin` observada anteriormente | Reproduzir na origem canônica com pós-verificação de sessão |
+
+### Gates e regras de execução
+1. O teste `verificarCatalogosNeon` é somente leitura, consulta diretamente os itens de fixtures publicadas e em rascunho e expõe `restricoesSemFixtureNaoComprovamNegativa`; **zero registros não equivale a negativa provada sem fixture**.
+2. Antes de qualquer teste negativo de escrita, exigir autorização específica para uma branch Neon descartável, registrar identificação da fixture e plano de limpeza/reconciliação. Não executar esses testes na branch de homologação atualmente usada pelos três perfis.
+3. Manter **NO-GO**: o gate `jwt_two_admins_verified` continua pendente; eventual substituição exige decisão formal, não apenas edição de evidências.
+4. Documentar resultados agregados sem dados pessoais, UUIDs, OTP, JWT, headers ou senhas.
