@@ -434,3 +434,20 @@ test('Neon JWT flags survive an RLS read error only after session revalidation',
   assert.match(service, /consultaSemErro: false,/);
   assert.match(service, /if \(alterouSessao \|\| usuarioFinal\.error/);
 });
+
+
+test('All versioned scale mutations are blocked outside the disposable branch', () => {
+  const admin = read('src/services/neon/rodizioAdminSql06HmlService.ts');
+  for (const source of [draftClient, statusClient, admin]) {
+    assert.match(source, /VITE_NEON_HOMOLOGACAO_ENABLED\s*!==\s*'true'/);
+    assert.match(source, /VITE_NEON_SQL06_ENABLED\s*!==\s*'true'/);
+    assert.match(source, /VITE_NEON_AUTH_URL\s*!==\s*authEndpoint/);
+    assert.match(source, /VITE_NEON_DATA_API_URL\s*!==\s*dataEndpoint/);
+    assert.match(source, /ep-nameless-dust-b6271958\.neonauth/);
+    assert.match(source, /ep-nameless-dust-b6271958\.apirest/);
+    assert.ok(source.indexOf("VITE_NEON_SQL06_ENABLED !== 'true'") < source.indexOf('const cliente = criarClienteNeon()'));
+  }
+  const build = read('scripts/build-cloudflare-homologacao.mjs');
+  assert.match(build, /VITE_NEON_SQL06_ENABLED:\s*'false'/);
+  assert.doesNotMatch(build, /VITE_NEON_SQL06_ENABLED:\s*'true'/);
+});
