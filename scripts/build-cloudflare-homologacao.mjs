@@ -1,12 +1,21 @@
 import { spawnSync } from 'node:child_process';
 
 const requiredBranch = 'chore/neon-migration-prep-20261115';
+const previewBranch = 'feat/neon-operacional-copilot';
+const branch = process.env.CF_PAGES_BRANCH;
 if (process.env.CF_PAGES !== '1') {
   console.error('[Homologação] Este comando só pode ser executado no Cloudflare Pages.');
   process.exit(1);
 }
-if (process.env.CF_PAGES_BRANCH !== requiredBranch) {
-  console.error('[Homologação] Branch incorreta. Esperada: ' + requiredBranch);
+if (branch !== requiredBranch && branch !== previewBranch) {
+  console.error('[Homologação] Branch não autorizada.');
+  process.exit(1);
+}
+
+// O preview não pode publicar no hostname canônico. CF_PAGES_URL é a URL
+// imutável do deployment fornecida pelo Cloudflare, não um alias de branch.
+if (branch === previewBranch && !/^https:\/\/[a-f0-9]+\.rodizio-portaria-neon-hml\.pages\.dev\/?$/.test(process.env.CF_PAGES_URL || '')) {
+  console.error('[Homologação] Preview exige URL de deployment isolado do projeto HML.');
   process.exit(1);
 }
 
