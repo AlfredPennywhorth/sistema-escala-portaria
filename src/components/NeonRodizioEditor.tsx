@@ -387,12 +387,7 @@ export function NeonRodizioEditor({
           {/* Vista: Gerar */}
           {vista === 'gerar' && rodizio && (
             <NeonRodizioGerador
-              dadosGeração={{
-                rodizio,
-                auxiliares: [],
-                restricoes: [],
-                historicoTravado: [],
-              }}
+              rodizio={rodizio}
               onGerado={(itensGerados) => {
                 setItens(itensGerados);
                 setVista('editar');
