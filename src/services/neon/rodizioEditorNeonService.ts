@@ -154,7 +154,7 @@ export async function substituirItensNeonEditor(
     return { data: null, error: result.error };
   }
   return {
-    data: result.data.itens.length,
+    data: result.data?.itens.length ?? null,
     error: null,
     novaRevisao: entrada.revisaoOriginal + 1,
   };
