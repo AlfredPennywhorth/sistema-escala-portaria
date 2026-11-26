@@ -235,12 +235,7 @@ export function NeonRodiziosOperacional() {
             )}
 
             <NeonRodizioGerador
-              dadosGeração={{
-                rodizio: estado.rodizioSelecionado,
-                auxiliares: [],
-                restricoes: [],
-                historicoTravado: [],
-              }}
+              rodizio={estado.rodizioSelecionado}
               onGerado={(itens) => {
                 setEstado((prev) => ({
                   ...prev,
