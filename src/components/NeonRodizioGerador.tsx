@@ -14,23 +14,26 @@ import { Zap, ChevronDown, Trash2, Copy, AlertCircle } from 'lucide-react';
 import {
   gerarSugestaoRodizioNeon,
   calcularQualidadeSugestao,
+  carregarDadosGeracaoNeon,
+  PORTAS_GERACAO_NEON,
   type DadosGeracaoNeon,
   type SugestaoGeracaoNeon,
 } from '../services/neon/rodizioGeracaoNeonService';
-import type { RodizioItemInput } from '../types/supabase';
+import type { Rodizio, RodizioItemInput } from '../types/supabase';
 
 interface NeonRodizioGeradorProps {
-  dadosGeração: DadosGeracaoNeon;
+  rodizio: Rodizio;
   onGerado?: (itens: RodizioItemInput[], sugestao: SugestaoGeracaoNeon) => void;
   onErro?: (mensagem: string) => void;
 }
 
 export function NeonRodizioGerador({
-  dadosGeração,
+  rodizio,
   onGerado,
   onErro,
 }: NeonRodizioGeradorProps) {
   const [gerando, setGerando] = useState(false);
+  const [dadosGeração, setDadosGeracao] = useState<DadosGeracaoNeon | null>(null);
   const [sugestao, setSugestao] = useState<SugestaoGeracaoNeon | null>(null);
   const [itensEditando, setItensEditando] = useState<RodizioItemInput[]>([]);
   const [expandidoDetalhes, setExpandidoDetalhes] = useState(false);
@@ -42,7 +45,10 @@ export function NeonRodizioGerador({
     setSugestao(null);
 
     try {
-      const resultado = gerarSugestaoRodizioNeon(dadosGeração);
+      const dados = await carregarDadosGeracaoNeon(rodizio);
+      if (dados.error || !dados.data) throw new Error(dados.error || 'Dados da geração indisponíveis.');
+      setDadosGeracao(dados.data);
+      const resultado = gerarSugestaoRodizioNeon(dados.data);
 
       if (resultado.itens.length === 0) {
         setErro(
@@ -248,7 +254,7 @@ export function NeonRodizioGerador({
               <tr>
                 <th className="text-left p-2 font-semibold text-slate-700">Data</th>
                 <th className="text-left p-2 font-semibold text-slate-700">Porta</th>
-                <th className="text-left p-2 font-semibold text-slate-700">Auxiliar ID</th>
+                <th className="text-left p-2 font-semibold text-slate-700">Auxiliar</th>
                 <th className="text-left p-2 font-semibold text-slate-700">Observações</th>
                 <th className="text-center p-2 font-semibold text-slate-700">Ações</th>
               </tr>
@@ -265,22 +271,16 @@ export function NeonRodizioGerador({
                     />
                   </td>
                   <td className="p-2">
-                    <input
-                      type="text"
-                      value={item.porta}
-                      onChange={(e) => editarItem(idx, 'porta', e.target.value)}
-                      className="w-full px-2 py-1 border border-slate-300 rounded text-xs"
-                      placeholder="1, 2..."
-                    />
+                    <select aria-label="Porta" value={item.porta} onChange={e => editarItem(idx, 'porta', e.target.value)} className="w-full border rounded p-1">
+                      <option value="">Selecione</option>
+                      {PORTAS_GERACAO_NEON.map(p => <option key={p.id} value={p.nome}>{p.nome}</option>)}
+                    </select>
                   </td>
                   <td className="p-2">
-                    <input
-                      type="text"
-                      value={item.auxiliar_id || ''}
-                      onChange={(e) => editarItem(idx, 'auxiliar_id', e.target.value || null)}
-                      className="w-full px-2 py-1 border border-slate-300 rounded text-xs"
-                      placeholder="UUID"
-                    />
+                    <select aria-label="Auxiliar" value={item.auxiliar_id || ''} onChange={e => editarItem(idx, 'auxiliar_id', e.target.value || null)} className="w-full border rounded p-1">
+                      <option value="">Selecione</option>
+                      {dadosGeração?.auxiliares.map(a => <option key={a.id} value={a.id}>{a.nome}</option>)}
+                    </select>
                   </td>
                   <td className="p-2">
                     <input
