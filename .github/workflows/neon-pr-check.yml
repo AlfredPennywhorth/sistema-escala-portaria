@@ -60,6 +60,25 @@ jobs:
         env:
           CF_PAGES: '1'
           CF_PAGES_BRANCH: chore/neon-migration-prep-20261115
+      - name: Cloudflare Pages isolated operational preview build
+        run: npm run build:cloudflare-homologacao
+        env:
+          CF_PAGES: '1'
+          CF_PAGES_BRANCH: feat/neon-operacional-copilot
+          CF_PAGES_URL: https://a123bcde.rodizio-portaria-neon-hml.pages.dev
+          VITE_NEON_SQL06_ENABLED: 'true'
+      - name: Reject unauthorized branch and non-isolated preview
+        shell: bash
+        run: |
+          if CF_PAGES=1 CF_PAGES_BRANCH=main npm run build:cloudflare-homologacao; then
+            echo "Unexpected production branch acceptance"; exit 1
+          fi
+          if CF_PAGES=1 CF_PAGES_BRANCH=feat/neon-operacional-copilot CF_PAGES_URL=https://rodizio-portaria-neon-hml.pages.dev npm run build:cloudflare-homologacao; then
+            echo "Unexpected canonical preview acceptance"; exit 1
+          fi
+          if CF_PAGES=1 CF_PAGES_BRANCH=feat/neon-operacional-copilot CF_PAGES_URL=https://a123bcde.rodizio-portaria.pages.dev npm run build:cloudflare-homologacao; then
+            echo "Unexpected production hostname acceptance"; exit 1
+          fi
       - name: Validate all Neon contracts and regressions (offline)
         run: node --test tests/neon-*.test.mjs
       - name: ESLint
