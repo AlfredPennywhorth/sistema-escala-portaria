@@ -21,6 +21,8 @@ function App() {
   const [result, setResult] = useState('Nenhum teste executado.');
   const [busy, setBusy] = useState(false);
   const [halted, setHalted] = useState(false);
+  const [armedRace, setArmedRace] = useState(false);
+  const raceActor = useRef<string | null>(null);
   const running = useRef(false);
   const attempted = useRef(new Set<Scenario>());
   const passed = useRef(new Set<Scenario>());
@@ -67,6 +69,8 @@ function App() {
     if (actor.perfil !== 'admin') throw Error('admin required');
     if (s==='valid' && !passed.current.has('invalid-fk')) throw Error('run FK negative first');
     if (s === 'race') {
+      if (!armedRace || raceActor.current !== actor.id) throw Error('arm race at revision zero first');
+      setArmedRace(false); raceActor.current = null;
       // Two operators must coordinate manually; each submits expected revision zero.
       // The final database reconciliation is independent and mandatory.
       const key = 'sql13-race-' + actor.id;
@@ -99,6 +103,24 @@ function App() {
     setResult(JSON.stringify({branch:'br-little-hill-b6q7979y',scenario:s,perfil:actor.perfil,sqlstate:code,expected,approved:valid},null,2));
     if (valid) passed.current.add(s); else setHalted(true);
   }
+  async function armRace() {
+    const actor = await identity();
+    if (actor.perfil !== 'admin') throw Error('admin required');
+    await snapshot(race,0,1);
+    raceActor.current=actor.id; setArmedRace(true);
+    setResult('Concorrência preparada na revisão 0. Coordenar disparo com o segundo administrador.');
+  }
+  async function logout() {
+    if (!client || running.current) return;
+    running.current=true; setBusy(true);
+    try {
+      const r=await client.auth.signOut(); if(r.error) throw Error('logout');
+      const s=await client.auth.getSession(); if(s.error||s.data.session) throw Error('session persists');
+      raceActor.current=null; setArmedRace(false); passed.current.clear();
+      setOtp(''); setEmail(''); setResult('Sessão encerrada.');
+    } catch {setHalted(true);setResult('Saída não confirmada; feche esta sessão e confira antes de continuar.');}
+    finally {running.current=false;setBusy(false);}
+  }
   if (!local) return <p>Cliente bloqueado: somente Vite DEV em http://localhost:5173.</p>;
   return <main style={{maxWidth:600,margin:'20px auto',padding:16,fontFamily:'system-ui'}}>
     <h1>SQL13 — teste isolado</h1><p>Branch descartável br-little-hill-b6q7979y. Não envie OTP ou JWT. Execute o positivo por último.</p>
@@ -107,8 +129,9 @@ function App() {
     <label>Código <input value={otp} onChange={e=>setOtp(e.target.value)} autoComplete="one-time-code" /></label>
     <p><button disabled={busy||halted||!otp} onClick={()=>void run(async()=>{const r=await client!.auth.verifyOtp({email:email.trim(),token:otp.trim(),type:'email'});setOtp('');if(r.error)throw Error('otp');setResult('Perfil confirmado: '+(await identity()).perfil);})}>Confirmar OTP</button></p>
     <button disabled={busy||halted} onClick={()=>void run(async()=>setResult('Perfil confirmado: '+(await identity()).perfil))}>Verificar identidade</button>
-    {(['negative','stale','locked','published','invalid-fk','valid','race'] as const).map(s=><p key={s}><button disabled={busy||halted||attempted.current.has(s)} onClick={()=>void run(()=>test(s))}>{s}</button></p>)}
-    <p><button disabled={busy} onClick={()=>void (async()=>{try{const r=await client!.auth.signOut();if(r.error)throw Error('logout');const s=await client!.auth.getSession();if(s.error||s.data.session)throw Error('session persists');setOtp('');setEmail('');setResult('Sessão encerrada.');}catch{setHalted(true);setResult('Saída não confirmada; feche esta sessão e confira antes de continuar.');}})()}>Encerrar sessão</button></p>
+    <p><button disabled={busy||halted||armedRace} onClick={()=>void run(armRace)}>Preparar concorrência na revisão 0</button></p>
+    {(['negative','stale','locked','published','invalid-fk','valid','race'] as const).map(s=><p key={s}><button disabled={busy||halted||attempted.current.has(s)||(s==='race'&&!armedRace)||(s==='valid'&&!passed.current.has('invalid-fk'))} onClick={()=>void run(()=>test(s))}>{s}</button></p>)}
+    <p><button disabled={busy} onClick={()=>void logout()}>Encerrar sessão</button></p>
     <pre style={{whiteSpace:'pre-wrap'}}>{result}</pre>
   </main>;
 }
