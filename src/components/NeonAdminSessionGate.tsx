@@ -53,7 +53,7 @@ export function NeonAdminSessionGate({ children }: { children: ReactNode }) {
     };
     try {
       const cliente = criarClienteNeon();
-      subscription = cliente.auth.onAuthStateChange((evento) => {
+      subscription = cliente.auth.onAuthStateChange((evento: unknown) => {
         // INITIAL_SESSION is the subscription's initial notification, not a
         // change of identity. The independent getUser/profile checks below
         // establish the initial authorization.
