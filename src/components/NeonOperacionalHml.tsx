@@ -145,7 +145,7 @@ export function NeonOperacionalHml() {
     setErro(null);
     setDetalhe(null);
     try {
-      const result = await obterRodizioComItensNeonHml(id);
+      const result = await obterRodizioComItensNeonHml(id, 'consulta-hml');
       if (!valido()) return;
       if (result.error || !result.data) {
         setErro(result.error || 'Escala indisponível. Consulte novamente.');
