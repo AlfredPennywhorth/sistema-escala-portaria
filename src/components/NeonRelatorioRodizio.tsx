@@ -36,7 +36,7 @@ export function NeonRelatorioRodizio({ rodizioId, onFechar }: NeonRelatorioRodiz
       setErro(null);
       setRodizio(null);
       try {
-        const [escala, cadastro] = await Promise.all([obterRodizioComItensNeonHml(rodizioId), listarAuxiliares(true)]);
+        const [escala, cadastro] = await Promise.all([obterRodizioComItensNeonHml(rodizioId, 'consulta-hml'), listarAuxiliares(true)]);
         if (!ativo) return;
         if (escala.error || !escala.data || cadastro.error || !cadastro.data || cadastro.data.length >= 1000) {
           setErro(escala.error || cadastro.error || 'Dados do relatório incompletos.');
