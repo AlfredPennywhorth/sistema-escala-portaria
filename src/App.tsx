@@ -12,6 +12,10 @@ import { NeonAuthHomologacao } from './components/NeonAuthHomologacao';
 import { NeonRpcBranchHomologacao } from './components/NeonRpcBranchHomologacao';
 import { NeonOperacionalHml } from './components/NeonOperacionalHml';
 import { NeonAreaAuxiliarHml } from './components/NeonAreaAuxiliarHml';
+import { NeonRodiziosOperacional } from './components/NeonRodiziosOperacional';
+import { NeonP2CadastrosReadOnly } from './components/NeonP2CadastrosReadOnly';
+import { NeonOperacaoIntegrada } from './components/NeonOperacaoIntegrada';
+import { NeonAdminSessionGate } from './components/NeonAdminSessionGate';
 
 function AppPrincipal() {
   const { loading } = useAuth();
@@ -73,6 +77,21 @@ export function App() {
     if (hostnameHml &&
         new URLSearchParams(window.location.search).get('minhas-datas-neon') === '1') {
       return <NeonAreaAuxiliarHml />;
+    }
+    if (hostnameHml &&
+        new URLSearchParams(window.location.search).get('editor-rodizios-neon') === '1') {
+      // Tela operacional com as 7 operações de editor de rodízios (P0)
+      return <NeonAdminSessionGate><NeonRodiziosOperacional /></NeonAdminSessionGate>;
+    }
+    if (hostnameHml &&
+        new URLSearchParams(window.location.search).get('p2-cadastros-neon') === '1') {
+      // P2: Consulta de auxiliares e restrições (somente leitura, mutações bloqueadas)
+      return <NeonAdminSessionGate><NeonP2CadastrosReadOnly /></NeonAdminSessionGate>;
+    }
+    if (hostnameHml &&
+        new URLSearchParams(window.location.search).get('p4-operacao-neon') === '1') {
+      // P4: Navegação e experiência operacional integrada (P0+P1+P3)
+      return <NeonAdminSessionGate><NeonOperacaoIntegrada /></NeonAdminSessionGate>;
     }
     if (hostnameHml &&
         new URLSearchParams(window.location.search).get('operacional-neon') === '1') {
