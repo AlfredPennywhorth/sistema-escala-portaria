@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { NeonRelatorioRodizio } from './NeonRelatorioRodizio';
+import { listarAuxiliares } from '../services/neon/auxiliaresService';
 import {
   listarRodiziosAdministrativosNeonHml,
   obterRodizioComItensNeonHml,
@@ -62,6 +63,17 @@ export function NeonRodiziosOperacional() {
     sucesso: null,
   });
 
+  const [nomesAuxiliares, setNomesAuxiliares] = useState<Record<string, string>>({});
+  const [erroNomes, setErroNomes] = useState<string | null>(null);
+  useEffect(() => {
+    let ativo = true;
+    void listarAuxiliares(true).then(r => {
+      if (!ativo) return;
+      if (r.error || !r.data || r.data.length >= 1000) setErroNomes(r.error || 'Cadastro incompleto.');
+      else setNomesAuxiliares(Object.fromEntries(r.data.map(a => [a.id, a.nome])));
+    });
+    return () => { ativo = false; };
+  }, []);
   // Carregar rodízios ao montar
   useEffect(() => {
     void carregarRodizios();
@@ -166,11 +178,8 @@ export function NeonRodiziosOperacional() {
    * Callback quando uma operação no editor completa com sucesso
    */
   function handleSucessoEditor(mensagem: string) {
-    setEstado((prev) => ({
-      ...prev,
-      sucesso: mensagem,
-    }));
     fecharEditor();
+    setEstado(prev => ({ ...prev, sucesso: mensagem }));
   }
 
   /**
@@ -186,6 +195,9 @@ export function NeonRodiziosOperacional() {
   // =========================================================================
   // Renderização
   // =========================================================================
+
+  // Relatório ocupa uma vista exclusiva para não imprimir a lista de escalas.
+  if (estado.relatorioRodizioId) return <NeonRelatorioRodizio rodizioId={estado.relatorioRodizioId} onFechar={() => setEstado(prev => ({ ...prev, relatorioRodizioId: null }))} />;
 
   // Vista: Editor
   if (estado.vista === 'editor') {
@@ -272,6 +284,7 @@ export function NeonRodiziosOperacional() {
               </button>
               <div className="flex gap-2">
                 <button
+                  disabled={estado.rodizioSelecionado.travado || estado.rodizioSelecionado.status !== 'rascunho'}
                   onClick={() => {
                     if (estado.rodizioSelecionado) {
                       setEstado((prev) => ({ ...prev, vista: 'gerar' }));
@@ -353,6 +366,7 @@ export function NeonRodiziosOperacional() {
               Itens da Escala ({estado.itens.length})
             </h2>
 
+            {erroNomes && <p role="alert" className="text-red-700">Não foi possível carregar os nomes: {erroNomes}</p>}
             {estado.itens.length === 0 ? (
               <p className="text-center text-slate-500 py-8">Nenhum item nesta escala.</p>
             ) : (
@@ -377,7 +391,7 @@ export function NeonRodiziosOperacional() {
                         </td>
                         <td className="px-4 py-3 text-slate-600">
                           {item.auxiliar_id
-                            ? item.auxiliar_id.substring(0, 8)
+                            ? (nomesAuxiliares[item.auxiliar_id] ?? 'Nome indisponível')
                             : '—'}
                         </td>
                         <td className="px-4 py-3 text-slate-600 max-w-xs truncate">
@@ -574,13 +588,7 @@ export function NeonRodiziosOperacional() {
         </div>
       </div>
 
-      {/* Relatório modal */}
-      {estado.relatorioRodizioId && (
-        <NeonRelatorioRodizio
-          rodizioId={estado.relatorioRodizioId}
-          onFechar={() => setEstado((prev) => ({ ...prev, relatorioRodizioId: null }))}
-        />
-      )}
+
     </div>
   );
 }
