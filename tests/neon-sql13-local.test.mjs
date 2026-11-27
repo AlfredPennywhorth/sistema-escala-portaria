@@ -21,3 +21,10 @@ test('SQL13 validates JWT, requires FK success and stops on divergent result',()
  assert.match(source,/localStorage\.setItem\(key,'1'\)/);
  assert.match(source,/requiresIndependentReconciliation:true/);
 });
+
+test('locked fixture proves RLS, published fixture exercises OCC independently',()=>{
+ assert.match(source,/s === 'locked' \? locked : s === 'stale' \|\| s === 'published' \? published/);
+ assert.match(source,/p_revisao_esperada:s==='stale'\?f.revisao\+1:f.revisao/);
+ assert.match(source,/s==='locked'\?'P0002'/);
+ assert.match(source,/não comprova ordem OCC/);
+});
