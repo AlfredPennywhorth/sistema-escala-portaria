@@ -12,7 +12,8 @@ const draft = { id: id(205), titulo: 'TESTE FICTICIO RPC JWT BRANCH TEMPORARIA',
 const locked = { id: id(206), titulo: 'TESTE FICTICIO TRANSICAO OCC COM ITEM', status: 'travado', travado: true, revisao: 2, count: 1 };
 const published = { id: id(203), titulo: 'TESTE FICTICIO PUBLICADO', status: 'publicado', travado: false, revisao: 0, count: 3 };
 type Fixture = typeof draft;
-type Scenario = 'stale' | 'locked' | 'published' | 'invalid-fk' | 'valid';
+type Scenario = 'stale' | 'locked' | 'published' | 'invalid-fk' | 'valid' | 'negative';
+const EMAILS = ['andre.w.souza@outlook.com.br','aws311274@gmail.com','andre.w.souza@outlook.com'];
 function App() {
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
@@ -31,7 +32,7 @@ function App() {
     if (!client) throw Error('disabled');
     const s = await client.auth.getSession();
     const user = s.data.session?.user;
-    if (s.error || !user) throw Error('session');
+    if (s.error || !user || !EMAILS.includes((user.email ?? '').toLowerCase())) throw Error('session');
     const jwt = await client.rpc('usuario_atual_id');
     if (jwt.error || jwt.data !== user.id) throw Error('identity');
     const p = await client.from('usuarios_auxiliares').select('perfil').eq('user_id', user.id).maybeSingle();
@@ -48,7 +49,19 @@ function App() {
   async function test(s: Scenario) {
     if (!client || attempted.current.has(s)) return;
     const actor = await identity();
+    if (s === 'negative') {
+      if (actor.perfil === 'admin') throw Error('non-admin required');
+      const key = 'sql13-attempt-negative-' + actor.perfil;
+      if (sessionStorage.getItem(key)) throw Error('already attempted');
+      sessionStorage.setItem(key,'1');
+      const r = await client.rpc('substituir_itens_rodizio_rascunho_versionado',{p_rodizio_id:draft.id,p_revisao_esperada:0,p_itens:[{data:'2026-12-15',porta:'Entrada',auxiliar_id:null,observacoes:'TESTE SQL13 NEGATIVA'}]});
+      const approved = r.error?.code === '42501' && (r.error?.message ?? '').includes('Somente administrador autenticado');
+      setResult(JSON.stringify({branch:'br-little-hill-b6q7979y',scenario:s,perfil:actor.perfil,sqlstate:r.error?.code??null,approved,requiresAdminReconciliation:true},null,2));
+      if(!approved) setHalted(true);
+      return;
+    }
     if (actor.perfil !== 'admin') throw Error('admin required');
+    if (s==='valid' && !attempted.current.has('invalid-fk')) throw Error('run FK negative first');
     const f = s === 'stale' || s === 'locked' ? locked : s === 'published' ? published : draft;
     const before = await snapshot(f,f.revisao,f.count);
     if ((await identity()).id !== actor.id) throw Error('session changed');
@@ -71,11 +84,12 @@ function App() {
   return <main style={{maxWidth:600,margin:'20px auto',padding:16,fontFamily:'system-ui'}}>
     <h1>SQL13 — teste isolado</h1><p>Branch descartável br-little-hill-b6q7979y. Não envie OTP ou JWT. Execute o positivo por último.</p>
     <label>E-mail <input type="email" value={email} onChange={e=>setEmail(e.target.value)} /></label>
-    <p><button disabled={busy||halted||!email} onClick={()=>void run(async()=>{const r=await client!.auth.signInWithOtp({email:email.trim()}); if(r.error) throw Error('otp');setResult('Código solicitado.');})}>Solicitar OTP</button></p>
+    <p><button disabled={busy||halted||!email} onClick={()=>void run(async()=>{if(!EMAILS.includes(email.trim().toLowerCase())) throw Error('account');const r=await client!.auth.signInWithOtp({email:email.trim()}); if(r.error) throw Error('otp');setResult('Código solicitado.');})}>Solicitar OTP</button></p>
     <label>Código <input value={otp} onChange={e=>setOtp(e.target.value)} autoComplete="one-time-code" /></label>
     <p><button disabled={busy||halted||!otp} onClick={()=>void run(async()=>{const r=await client!.auth.verifyOtp({email:email.trim(),token:otp.trim(),type:'email'});setOtp('');if(r.error)throw Error('otp');setResult('Perfil confirmado: '+(await identity()).perfil);})}>Confirmar OTP</button></p>
     <button disabled={busy||halted} onClick={()=>void run(async()=>setResult('Perfil confirmado: '+(await identity()).perfil))}>Verificar identidade</button>
-    {(['stale','locked','published','invalid-fk','valid'] as const).map(s=><p key={s}><button disabled={busy||halted||attempted.current.has(s)} onClick={()=>void run(()=>test(s))}>{s}</button></p>)}
+    {(['negative','stale','locked','published','invalid-fk','valid'] as const).map(s=><p key={s}><button disabled={busy||halted||attempted.current.has(s)} onClick={()=>void run(()=>test(s))}>{s}</button></p>)}
+    <p><button disabled={busy} onClick={()=>void (async()=>{try{const r=await client!.auth.signOut();if(r.error)throw Error('logout');const s=await client!.auth.getSession();if(s.error||s.data.session)throw Error('session persists');setOtp('');setEmail('');setResult('Sessão encerrada.');}catch{setHalted(true);setResult('Saída não confirmada; feche esta sessão e confira antes de continuar.');}})()}>Encerrar sessão</button></p>
     <pre style={{whiteSpace:'pre-wrap'}}>{result}</pre>
   </main>;
 }
