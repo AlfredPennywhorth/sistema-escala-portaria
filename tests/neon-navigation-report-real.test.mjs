@@ -8,7 +8,7 @@ const rodizio={id:'r1',titulo:'Escala',data_inicio:'2026-11-22',data_fim:'2026-1
 const item={data:'2026-11-22',porta:'Entrada',periodo:null,auxiliar_id:'a1',observacoes:null};
 const next={...item,auxiliar_id:'a2'};
 const Editor=()=>null, Gerador=()=>null, Relatorio=()=>null;
-function mount(name, props={}, cadastro=[{id:'a1',nome:'Auxiliar Teste'}]){
+function mount(name, props={}, cadastro=[{id:'a1',nome:'Auxiliar Teste'}], env={VITE_NEON_SQL06_ENABLED:'false'}){
   const states=[],effects=[];let idx=0,started=false,prints=0;
   const hooks={useState(init){const i=idx++;if(!(i in states))states[i]=typeof init==='function'?init():init;return [states[i],v=>{states[i]=typeof v==='function'?v(states[i]):v;}];},useEffect(fn){if(!started)effects.push(fn);}};
   const js=ts.transpileModule(readFileSync('src/components/'+name+'.tsx','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
@@ -23,7 +23,7 @@ function mount(name, props={}, cadastro=[{id:'a1',nome:'Auxiliar Teste'}]){
     if(id==='/logo-ccb.png')return '/logo-ccb.png';
     return reqNode(id);
   }
-  new Function('require','module','exports','window',js)(req,module,module.exports,{print(){prints++;}});
+  new Function('require','module','exports','window','viteEnv',js.replaceAll('import.meta.env','viteEnv'))(req,module,module.exports,{print(){prints++;}},Object.freeze(env));
   function render(){idx=0;return module.exports[name](props);}
   function walk(node,out=[]){if(Array.isArray(node)){for(const n of node)walk(n,out);}else if(node&&typeof node==='object'&&node.props){out.push(node);walk(node.props.children,out);}return out;}
   function nodes(){return walk(render());}
@@ -35,6 +35,7 @@ function mount(name, props={}, cadastro=[{id:'a1',nome:'Auxiliar Teste'}]){
 test('real navigation preserves persisted baseline when applying generated items',async()=>{
   const m=mount('NeonRodiziosOperacional');await m.ready();
   await m.button('Visualizar detalhes').onClick();await m.flush();
+  assert.equal(m.button('Gerar').disabled,false);
   m.button('Gerar').onClick();
   const g=m.nodes().find(n=>n.type===Gerador);assert.ok(g);
   g.props.onGerado([next]);
@@ -58,4 +59,9 @@ test('real report refuses printing if referenced auxiliary is missing',async()=>
   assert.ok(JSON.stringify(m.render()).includes('não foram localizadas'));
   assert.ok(!m.nodes().some(n=>n.type==='button'&&JSON.stringify(n.props.children).includes('Imprimir')));
   assert.equal(m.prints(),0);
+});
+
+test('canonical HML disables creation when versioned writes are not released',async()=>{
+  const m=mount('NeonRodiziosOperacional');await m.ready();
+  assert.equal(m.button('Novo Rascunho').disabled,true);
 });
