@@ -117,7 +117,7 @@ export function NeonRodiziosOperacional() {
       erro: null,
     }));
 
-    const result = await obterRodizioComItensNeonHml(rodizio.id);
+    const result = await obterRodizioComItensNeonHml(rodizio.id, 'consulta-hml');
     if (result.error) {
       setEstado((prev) => ({
         ...prev,
@@ -148,6 +148,7 @@ export function NeonRodiziosOperacional() {
    * Abrir editor para criar novo rascunho
    */
   function abrirEditorNovo() {
+    if (import.meta.env.VITE_NEON_SQL06_ENABLED === 'false') return;
     setEstado((prev) => ({
       ...prev,
       rodizioSelecionado: null,
@@ -161,6 +162,7 @@ export function NeonRodiziosOperacional() {
    * Abrir editor para editar rodízio existente
    */
   function abrirEditorExistente(rodizio: RodizioNeonVersionado) {
+    if (rodizio.revisao == null) return;
     void abrirDetalhes(rodizio, 'editor');
   }
 
@@ -224,7 +226,7 @@ export function NeonRodiziosOperacional() {
       <div className="min-h-screen bg-gradient-to-br from-yellow-50 to-amber-100 p-4">
         <div className="max-w-6xl mx-auto">
           <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
               <button
                 onClick={() => setEstado((prev) => ({ ...prev, vista: 'detalhes' }))}
                 className="px-4 py-2 text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200 transition"
@@ -233,7 +235,7 @@ export function NeonRodiziosOperacional() {
               </button>
             </div>
 
-            <h1 className="text-3xl font-bold text-slate-900 mb-2">
+            <h1 className="text-xl sm:text-3xl font-bold text-slate-900 mb-2">
               Gerar Escala: {estado.rodizioSelecionado.titulo}
             </h1>
 
@@ -281,16 +283,16 @@ export function NeonRodiziosOperacional() {
         <div className="max-w-6xl mx-auto">
           {/* Cabeçalho */}
           <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
               <button
                 onClick={() => setEstado((prev) => ({ ...prev, vista: 'lista' }))}
                 className="px-4 py-2 text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200 transition"
               >
                 ← Voltar
               </button>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <button
-                  disabled={estado.rodizioSelecionado.travado || estado.rodizioSelecionado.status !== 'rascunho'}
+                  disabled={estado.rodizioSelecionado.revisao == null || estado.rodizioSelecionado.travado || estado.rodizioSelecionado.status !== 'rascunho'}
                   onClick={() => {
                     if (estado.rodizioSelecionado) {
                       setEstado((prev) => ({ ...prev, vista: 'gerar' }));
@@ -302,6 +304,7 @@ export function NeonRodiziosOperacional() {
                   Gerar
                 </button>
                 <button
+                  disabled={estado.rodizioSelecionado.revisao == null}
                   onClick={() => {
                     if (estado.rodizioSelecionado) {
                       abrirEditorExistente(estado.rodizioSelecionado);
@@ -326,7 +329,7 @@ export function NeonRodiziosOperacional() {
               </div>
             </div>
 
-            <h1 className="text-3xl font-bold text-slate-900 mb-2">
+            <h1 className="text-xl sm:text-3xl font-bold text-slate-900 mb-2">
               {estado.rodizioSelecionado.titulo}
             </h1>
 
@@ -352,7 +355,7 @@ export function NeonRodiziosOperacional() {
               <div>
                 <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Revisão</p>
                 <p className="text-sm font-semibold text-slate-900">
-                  {estado.rodizioSelecionado.revisao}
+                  {estado.rodizioSelecionado.revisao ?? 'Indisponível'}
                 </p>
               </div>
             </div>
@@ -421,16 +424,16 @@ export function NeonRodiziosOperacional() {
       <div className="max-w-6xl mx-auto">
         {/* Cabeçalho */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
             <div>
-              <h1 className="text-3xl font-bold text-slate-900">
+              <h1 className="text-xl sm:text-3xl font-bold text-slate-900">
                 Gerenciador de Rodízios Neon
               </h1>
               <p className="text-slate-600 mt-1">
                 Operações administrativas no ambiente de homologação
               </p>
             </div>
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-3">
               <button
                 onClick={carregarRodizios}
                 disabled={estado.carregando}
@@ -441,6 +444,7 @@ export function NeonRodiziosOperacional() {
               </button>
               <button
                 onClick={abrirEditorNovo}
+                disabled={import.meta.env.VITE_NEON_SQL06_ENABLED === 'false'}
                 className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2 transition"
               >
                 <Plus size={18} />
@@ -450,6 +454,7 @@ export function NeonRodiziosOperacional() {
           </div>
         </div>
 
+        {import.meta.env.VITE_NEON_SQL06_ENABLED === 'false' && <p className="mb-4 rounded bg-amber-50 p-3 text-sm text-amber-900">Homologação somente leitura. Gravações versionadas ainda não liberadas.</p>}
         {/* Alertas */}
         {estado.erro && (
           <div className="bg-red-50 border-l-4 border-red-500 rounded-lg p-4 mb-6">
@@ -488,6 +493,7 @@ export function NeonRodiziosOperacional() {
               <p className="text-slate-600 mb-4">Nenhum rodízio encontrado.</p>
               <button
                 onClick={abrirEditorNovo}
+                disabled={import.meta.env.VITE_NEON_SQL06_ENABLED === 'false'}
                 className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 inline-flex items-center gap-2"
               >
                 <Plus size={18} />
@@ -555,7 +561,7 @@ export function NeonRodiziosOperacional() {
                         </span>
                       </td>
                       <td className="px-6 py-4 text-sm text-slate-700">
-                        {rodizio.revisao}
+                        {rodizio.revisao ?? 'Indisponível'}
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-2">
@@ -567,6 +573,7 @@ export function NeonRodiziosOperacional() {
                             <Eye size={18} />
                           </button>
                           <button
+                            disabled={rodizio.revisao == null}
                             onClick={() => abrirEditorExistente(rodizio)}
                             className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
                             title="Editar rodízio"
