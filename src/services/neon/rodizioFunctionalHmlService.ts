@@ -54,6 +54,7 @@ export async function listarRodiziosAdministrativosNeonHml(): Promise<ServiceRes
 
 export async function obterRodizioComItensNeonHml(
   rodizioId: string,
+  modo: 'versionado' | 'consulta-hml' = 'versionado',
 ): Promise<ServiceResult<RodizioComItens | null>> {
   try {
     const acesso = await exigirAdministrador();
@@ -78,17 +79,24 @@ export async function obterRodizioComItensNeonHml(
     // Ler a revisão novamente detecta gravação concluída entre cabeçalho
     // e itens, impedindo devolver um objeto misturado ou confirmar escrita
     // baseada em contagem coincidente. Não substituir o cabecalho antigo.
+    const revisaoInicial = (cabecalho.data as Rodizio & { revisao?: number | string }).revisao;
+    // Only the canonical read-only HML build can inspect the pre-versioned schema.
+    // This exception never supplies a synthetic revision or authorizes a write.
+    const leituraLegada = modo === 'consulta-hml' && revisaoInicial == null &&
+      import.meta.env.VITE_NEON_SQL06_ENABLED === 'false' &&
+      import.meta.env.VITE_NEON_AUTH_URL === 'https://ep-purple-water-b6agr3hn.neonauth.c-2.sa-east-1.aws.neon.tech/rodizio_portas/auth' &&
+      import.meta.env.VITE_NEON_DATA_API_URL === 'https://ep-purple-water-b6agr3hn.apirest.c-2.sa-east-1.aws.neon.tech/rodizio_portas/rest/v1';
     const confirmacao = await cliente.from('rodizios')
-      .select('id,revisao,status,travado')
+      .select(leituraLegada ? '*' : 'id,revisao,status,travado')
       .eq('id', rodizioId).maybeSingle();
     if (confirmacao.error) return { data: null, error: confirmacao.error.message };
     if (!confirmacao.data) {
       return { data: null, error: 'Escala indisponível durante a leitura; consultar novamente.' };
     }
-    const revisaoInicial = (cabecalho.data as Rodizio & { revisao?: number | string }).revisao;
-    if (revisaoInicial == null ||
+    if ((!leituraLegada && (revisaoInicial == null ||
         confirmacao.data.revisao == null ||
-        String(revisaoInicial) !== String(confirmacao.data.revisao) ||
+        String(revisaoInicial) !== String(confirmacao.data.revisao))) ||
+        (leituraLegada && (confirmacao.data.revisao != null || JSON.stringify(cabecalho.data) !== JSON.stringify(confirmacao.data))) ||
         cabecalho.data.status !== confirmacao.data.status ||
         cabecalho.data.travado !== confirmacao.data.travado) {
       return {
@@ -97,6 +105,12 @@ export async function obterRodizioComItensNeonHml(
       };
     }
 
+    if (leituraLegada) {
+      // Without OCC this is best-effort inspection, not a transactional snapshot.
+      const repeticao = await cliente.from('rodizio_itens').select('*')
+        .eq('rodizio_id', rodizioId).order('data', { ascending: true }).order('id', { ascending: true }).limit(MAX_ITENS_LEITURA + 1);
+      if (repeticao.error || !repeticao.data || JSON.stringify(resultado.data) !== JSON.stringify(repeticao.data)) return { data: null, error: 'Itens alterados durante a consulta sem revisão; recarregue.' };
+    }
     return {
       data: {
         rodizio: cabecalho.data as Rodizio,
