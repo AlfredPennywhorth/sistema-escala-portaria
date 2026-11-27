@@ -45,6 +45,7 @@ interface EstadoOperacional {
   rodizios: RodizioNeonVersionado[];
   rodizioSelecionado: RodizioNeonVersionado | null;
   itens: RodizioItemInput[];
+  sugestaoLocal: RodizioItemInput[] | null;
   relatorioRodizioId: string | null;
   carregando: boolean;
   erro: string | null;
@@ -57,6 +58,7 @@ export function NeonRodiziosOperacional() {
     rodizios: [],
     rodizioSelecionado: null,
     itens: [],
+    sugestaoLocal: null,
     relatorioRodizioId: null,
     carregando: true,
     erro: null,
@@ -128,6 +130,7 @@ export function NeonRodiziosOperacional() {
       setEstado((prev) => ({
         ...prev,
         rodizioSelecionado: rodizioData,
+        sugestaoLocal: null,
         itens: itens.map((item) => ({
           data: item.data,
           porta: item.porta,
@@ -149,6 +152,7 @@ export function NeonRodiziosOperacional() {
       ...prev,
       rodizioSelecionado: null,
       itens: [],
+      sugestaoLocal: null,
       vista: 'editor',
     }));
   }
@@ -169,6 +173,7 @@ export function NeonRodiziosOperacional() {
       vista: 'lista',
       rodizioSelecionado: null,
       itens: [],
+      sugestaoLocal: null,
       sucesso: null,
     }));
     carregarRodizios();
@@ -205,6 +210,7 @@ export function NeonRodiziosOperacional() {
       <NeonRodizioEditor
         rodizio={estado.rodizioSelecionado}
         itens={estado.itens}
+        sugestaoInicial={estado.sugestaoLocal}
         onFechar={fecharEditor}
         onSucesso={handleSucessoEditor}
         onErro={handleErroEditor}
@@ -251,7 +257,7 @@ export function NeonRodiziosOperacional() {
               onGerado={(itens) => {
                 setEstado((prev) => ({
                   ...prev,
-                  itens,
+                  sugestaoLocal: itens.map(item => ({ ...item })),
                   vista: 'editor',
                 }));
               }}
