@@ -10,9 +10,10 @@ const client = local ? createClient({ auth: { url: authUrl, adapter: SupabaseAut
 const id = (n: number) => '00000000-0000-4000-8000-000000000' + n;
 const draft = { id: id(205), titulo: 'TESTE FICTICIO RPC JWT BRANCH TEMPORARIA', status: 'rascunho', travado: false, revisao: 0, count: 1 };
 const locked = { id: id(206), titulo: 'TESTE FICTICIO TRANSICAO OCC COM ITEM', status: 'travado', travado: true, revisao: 2, count: 1 };
+const race = { id: id(202), titulo: 'TESTE FICTICIO RASCUNHO', status: 'rascunho', travado: false, revisao: 0, count: 1 };
 const published = { id: id(203), titulo: 'TESTE FICTICIO PUBLICADO', status: 'publicado', travado: false, revisao: 0, count: 3 };
 type Fixture = typeof draft;
-type Scenario = 'stale' | 'locked' | 'published' | 'invalid-fk' | 'valid' | 'negative';
+type Scenario = 'race' | 'stale' | 'locked' | 'published' | 'invalid-fk' | 'valid' | 'negative';
 const EMAILS = ['andre.w.souza@outlook.com.br','aws311274@gmail.com','andre.w.souza@outlook.com'];
 function App() {
   const [email, setEmail] = useState('');
@@ -22,6 +23,7 @@ function App() {
   const [halted, setHalted] = useState(false);
   const running = useRef(false);
   const attempted = useRef(new Set<Scenario>());
+  const passed = useRef(new Set<Scenario>());
   async function run(action: () => Promise<void>) {
     if (running.current || !client || halted) return;
     running.current = true; setBusy(true);
@@ -52,22 +54,39 @@ function App() {
     if (s === 'negative') {
       if (actor.perfil === 'admin') throw Error('non-admin required');
       const key = 'sql13-attempt-negative-' + actor.perfil;
-      if (sessionStorage.getItem(key)) throw Error('already attempted');
-      sessionStorage.setItem(key,'1');
+      if (localStorage.getItem(key)) throw Error('already attempted');
+      localStorage.setItem(key,'1');
+      if ((await identity()).id !== actor.id) throw Error('session changed');
       const r = await client.rpc('substituir_itens_rodizio_rascunho_versionado',{p_rodizio_id:draft.id,p_revisao_esperada:0,p_itens:[{data:'2026-12-15',porta:'Entrada',auxiliar_id:null,observacoes:'TESTE SQL13 NEGATIVA'}]});
+      if ((await identity()).id !== actor.id) throw Error('session changed');
       const approved = r.error?.code === '42501' && (r.error?.message ?? '').includes('Somente administrador autenticado');
       setResult(JSON.stringify({branch:'br-little-hill-b6q7979y',scenario:s,perfil:actor.perfil,sqlstate:r.error?.code??null,approved,requiresAdminReconciliation:true},null,2));
       if(!approved) setHalted(true);
       return;
     }
     if (actor.perfil !== 'admin') throw Error('admin required');
-    if (s==='valid' && !attempted.current.has('invalid-fk')) throw Error('run FK negative first');
+    if (s==='valid' && !passed.current.has('invalid-fk')) throw Error('run FK negative first');
+    if (s === 'race') {
+      // Two operators must coordinate manually; each submits expected revision zero.
+      // The final database reconciliation is independent and mandatory.
+      const key = 'sql13-race-' + actor.id;
+      if (localStorage.getItem(key)) throw Error('already attempted');
+      const before = await client.from('rodizios').select('id,titulo,status,travado,revisao').eq('id',race.id).maybeSingle();
+      if (before.error || !before.data || before.data.titulo!==race.titulo || before.data.status!=='rascunho' || before.data.travado!==false || !['0','1'].includes(String(before.data.revisao))) throw Error('fixture');
+      if ((await identity()).id !== actor.id) throw Error('session changed');
+      localStorage.setItem(key,'1'); attempted.current.add(s);
+      const r = await client.rpc('substituir_itens_rodizio_rascunho_versionado',{p_rodizio_id:race.id,p_revisao_esperada:0,p_itens:[{data:'2026-12-15',porta:'Entrada',auxiliar_id:null,observacoes:'TESTE SQL13 CONCORRENCIA'}]});
+      if ((await identity()).id !== actor.id) throw Error('session changed');
+      const acceptable = r.error?.code==='P0001' || (!r.error && String(r.data)==='1');
+      setResult(JSON.stringify({scenario:s,sqlstate:r.error?.code??null,returnValue:r.error?null:r.data,acceptable,requiresIndependentReconciliation:true},null,2));
+      if(!acceptable) setHalted(true); return;
+    }
     const f = s === 'stale' || s === 'locked' ? locked : s === 'published' ? published : draft;
     const before = await snapshot(f,f.revisao,f.count);
     if ((await identity()).id !== actor.id) throw Error('session changed');
     const key = 'sql13-attempt-' + s;
-    if (sessionStorage.getItem(key)) throw Error('already attempted');
-    sessionStorage.setItem(key,'1'); attempted.current.add(s);
+    if (localStorage.getItem(key)) throw Error('already attempted');
+    localStorage.setItem(key,'1'); attempted.current.add(s);
     const response = await client.rpc('substituir_itens_rodizio_rascunho_versionado',{
       p_rodizio_id:f.id,p_revisao_esperada:s==='stale'?1:f.revisao,
       p_itens:[{data:'2026-12-15',porta:'Entrada',auxiliar_id:s==='invalid-fk'?'ffffffff-ffff-4fff-8fff-ffffffffffff':null,observacoes:'TESTE SQL13'}]
@@ -76,9 +95,9 @@ function App() {
     const after = await snapshot(f,s==='valid'&&!response.error?1:f.revisao,s==='valid'&&!response.error?1:f.count);
     const code = response.error?.code ?? null;
     const expected = s==='stale'?'P0001':s==='invalid-fk'?'23503':s==='valid'?null:'42501';
-    const valid = s==='valid' ? !response.error && String(response.data)==='1' && after.items[0]?.porta==='Entrada' && after.items[0]?.observacoes==='TESTE SQL13' : code===expected && JSON.stringify(before)===JSON.stringify(after) && (expected!=='42501'||(response.error?.message??'').includes('Substituicao permitida somente'));
+    const valid = s==='valid' ? !response.error && String(response.data)==='1' && after.items[0]?.porta==='Entrada' && after.items[0]?.observacoes==='TESTE SQL13' && String(after.items[0]?.data).slice(0,10)==='2026-12-15' && after.items[0]?.auxiliar_id===null : code===expected && JSON.stringify(before)===JSON.stringify(after) && (expected!=='42501'||(response.error?.message??'').includes('Substituicao permitida somente'));
     setResult(JSON.stringify({branch:'br-little-hill-b6q7979y',scenario:s,perfil:actor.perfil,sqlstate:code,expected,approved:valid},null,2));
-    if (!valid) setHalted(true);
+    if (valid) passed.current.add(s); else setHalted(true);
   }
   if (!local) return <p>Cliente bloqueado: somente Vite DEV em http://localhost:5173.</p>;
   return <main style={{maxWidth:600,margin:'20px auto',padding:16,fontFamily:'system-ui'}}>
@@ -88,7 +107,7 @@ function App() {
     <label>Código <input value={otp} onChange={e=>setOtp(e.target.value)} autoComplete="one-time-code" /></label>
     <p><button disabled={busy||halted||!otp} onClick={()=>void run(async()=>{const r=await client!.auth.verifyOtp({email:email.trim(),token:otp.trim(),type:'email'});setOtp('');if(r.error)throw Error('otp');setResult('Perfil confirmado: '+(await identity()).perfil);})}>Confirmar OTP</button></p>
     <button disabled={busy||halted} onClick={()=>void run(async()=>setResult('Perfil confirmado: '+(await identity()).perfil))}>Verificar identidade</button>
-    {(['negative','stale','locked','published','invalid-fk','valid'] as const).map(s=><p key={s}><button disabled={busy||halted||attempted.current.has(s)} onClick={()=>void run(()=>test(s))}>{s}</button></p>)}
+    {(['negative','stale','locked','published','invalid-fk','valid','race'] as const).map(s=><p key={s}><button disabled={busy||halted||attempted.current.has(s)} onClick={()=>void run(()=>test(s))}>{s}</button></p>)}
     <p><button disabled={busy} onClick={()=>void (async()=>{try{const r=await client!.auth.signOut();if(r.error)throw Error('logout');const s=await client!.auth.getSession();if(s.error||s.data.session)throw Error('session persists');setOtp('');setEmail('');setResult('Sessão encerrada.');}catch{setHalted(true);setResult('Saída não confirmada; feche esta sessão e confira antes de continuar.');}})()}>Encerrar sessão</button></p>
     <pre style={{whiteSpace:'pre-wrap'}}>{result}</pre>
   </main>;
