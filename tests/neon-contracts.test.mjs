@@ -284,7 +284,7 @@ test('Neon operational preview is read-only and isolated from production', () =>
   assert.match(source, /obterPerfilUsuarioAtual\(/);
   assert.match(source, /vinculo\.data\?\.perfil !== 'admin'/);
   assert.match(source, /listarRodiziosAdministrativosNeonHml\(/);
-  assert.match(source, /obterRodizioComItensNeonHml\(/);
+  assert.match(source, /obterRodizioComItensNeonHml\(id, 'consulta-hml'\)/);
   assert.match(source, /listarAuxiliares\(true\)/);
   assert.match(source, /listarRestricoesAtivas\(/);
   assert.doesNotMatch(source, /from ['"]\.\.\/services\/rodiziosService|from ['"]\.\.\/lib\/supabase/);
