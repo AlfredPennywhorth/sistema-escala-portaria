@@ -39,6 +39,7 @@ import { PORTAS_GERACAO_NEON } from '../services/neon/rodizioGeracaoNeonService'
 interface NeonRodizioEditorProps {
   rodizio: RodizioNeonVersionado | null;
   itens: RodizioItemInput[];
+  sugestaoInicial?: RodizioItemInput[] | null;
   onFechar: () => void;
   onSucesso?: (mensagem: string, novaRevisao?: number) => void;
   onErro?: (mensagem: string) => void;
@@ -47,6 +48,7 @@ interface NeonRodizioEditorProps {
 export function NeonRodizioEditor({
   rodizio,
   itens: itensInicial,
+  sugestaoInicial,
   onFechar,
   onSucesso,
   onErro,
@@ -61,7 +63,8 @@ export function NeonRodizioEditor({
   const [observacoes, setObservacoes] = useState(rodizio?.observacoes ?? '');
 
   // Estado dos itens
-  const [itens, setItens] = useState<RodizioItemInput[]>(itensInicial);
+  const [baseline] = useState(() => itensInicial.map(item => ({ ...item })));
+  const [itens, setItens] = useState<RodizioItemInput[]>(() => (sugestaoInicial ?? baseline).map(item => ({ ...item })));
 
   const [auxiliares, setAuxiliares] = useState<Auxiliar[] | null>(null);
   const [erroAuxiliares, setErroAuxiliares] = useState<string | null>(null);
@@ -95,7 +98,7 @@ export function NeonRodizioEditor({
   const rascunhoEditavel = !!rodizio && rodizio.status === 'rascunho' && rodizio.travado === false;
   const bloquearItens = emOperacao || reconciliar || !rascunhoEditavel || !auxiliares || !Number.isSafeInteger(revisaoOriginal);
   const bloquearCabecalho = emOperacao || reconciliar || (!!rodizio && (!rascunhoEditavel || !Number.isSafeInteger(revisaoOriginal)));
-  const itensAlterados = JSON.stringify(itens) !== JSON.stringify(itensInicial);
+  const itensAlterados = JSON.stringify(itens) !== JSON.stringify(baseline);
   const cabecalhoAlterado = !!rodizio && (titulo !== rodizio.titulo || dataInicio !== rodizio.data_inicio || dataFim !== rodizio.data_fim || observacoes !== (rodizio.observacoes ?? ''));
 
   // =========================================================================
@@ -250,7 +253,7 @@ export function NeonRodizioEditor({
    * P0.4 — Publicar rodízio
    */
   async function handlePublicar() {
-    if (!rascunhoEditavel || itensAlterados || cabecalhoAlterado || itensInicial.length === 0) return;
+    if (!rascunhoEditavel || itensAlterados || cabecalhoAlterado || baseline.length === 0) return;
     if (!rodizio) {
       setErro('Rodízio não carregado. Recarregue e tente novamente.');
       return;
@@ -593,7 +596,7 @@ export function NeonRodizioEditor({
               <div className="grid grid-cols-2 gap-3">
                 <button
                   onClick={handlePublicar}
-                  disabled={bloquearCabecalho || itensAlterados || cabecalhoAlterado || itensInicial.length === 0}
+                  disabled={bloquearCabecalho || itensAlterados || cabecalhoAlterado || baseline.length === 0}
                   className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-slate-400 flex items-center justify-center gap-2 transition text-sm"
                 >
                   <Send size={16} />
