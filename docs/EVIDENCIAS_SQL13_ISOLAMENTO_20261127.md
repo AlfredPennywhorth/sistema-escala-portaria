@@ -45,3 +45,13 @@ O responsável autorizou expressamente o procedimento alternativo exclusivamente
 - Hash SQL13 f2100180626d8fd8881aebb99ca57d0d e hashes de escalas/itens anteriores preservados após provisionamento. Três vínculos existentes correspondem a três identidades no catálogo neon_auth.user (um admin, uma coordenadora, uma auxiliar), zero sessões ativas no instante da consulta.
 - Teste de banco: SET LOCAL ROLE authenticated, usuario_atual_id() IS NULL, chamada RPC SQL13 com UUID fictício e payload sintaticamente válido; capturado SQLSTATE 42501. Prova negativa sem JWT em conexão SQL, não prova HTTP nem JWT real; sem mutação.
 - Endpoint novamente desabilitado. Não foi alterada a configuração da aplicação canônica nem promovida conta. O build atual não aponta para a nova branch; requer origem/cliente de teste isolado, allowlist exata e autenticação real. Segundo Admin ainda pendente. CORS não impede clientes não-browser. SQL12 e produção NO-GO.
+
+## Homologação funcional com JWT real — 27/11/2026
+Cliente local no commit 587091ef9be862ce0594b4ed7c0c05ea92d688f3, CI 46081479489 aprovado e Codex sem problemas relevantes. OTP entregue; primeira confirmação de identidade inconclusiva, segunda confirmou Admin via comparação da identidade da sessão com RPC PostgreSQL e vínculo. Operador enviou seis resultados approved:true:
+- Admin stale P0001 em publicado não travado com revisão divergente.
+- Admin locked P0002 por RLS, não prova precedência OCC em histórico.
+- Admin published 42501 por estado.
+- Admin invalid-fk 23503, snapshot antes/depois idêntico.
+- Admin valid sem erro, fixture 205 revisão 0 -> 1, um item correto.
+- Auxiliar negative 42501 por perfil, JWT real confirmado.
+Reconciliação independente após negativa: fixture 205 rev 1, exatamente um item esperado (Entrada, 2026-12-15, auxiliar_id null, observacoes TESTE SQL13); outras escalas hash 54e1b185d387749751e26c7269adb261 e outros itens 24e3ea9274852d359e9f8ca0dcb70593 iguais ao baseline da branch de recuperação. A negativa ocorreu após positivo (rev esperada 0), mas mensagem de autorização exigida pelo cliente confirma causa por perfil. Não repetir fixtures consumidas. Um Admin ativo no cadastro; concorrência de duas identidades ainda não realizada. Não executar SQL12 até gate e autorização aplicáveis. Não houve mudança em outras branches ou produção.
