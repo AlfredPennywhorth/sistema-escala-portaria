@@ -36,7 +36,8 @@ function mount(props, response={data:1,error:null,novaRevisao:8}){
   function walk(node,found=[]){if(Array.isArray(node)){for(const n of node)walk(n,found);}else if(node&&typeof node==='object'&&node.props){found.push(node);walk(node.props.children,found);}return found;}
   function button(label){const b=walk(render()).find(n=>n.type==='button'&&JSON.stringify(n.props.children).includes(label));assert.ok(b,'button '+label);return b.props;}
   async function ready(){render();effectDone=true;for(const fn of effects)fn();effects=[];await Promise.resolve();}
-  return {ready,button,calls};
+  function field(label){const n=walk(render()).find(n=>n.props['aria-label']===label);assert.ok(n,label);return n.props;}
+  return {ready,button,calls,field};
 }
 test('suggestion does not replace persisted baseline; publishing stays blocked',async()=>{
   const m=mount({sugestaoInicial:[newItem]});await m.ready();
@@ -61,4 +62,28 @@ test('uncertain response blocks subsequent save using original revision',async()
   await save();await save();
   assert.equal(m.calls.length,1);
   assert.equal(m.button('P0.3').disabled,true);
+});
+
+test('manual editing sends actual field values through versioned adapter',async()=>{
+  const m=mount({});await m.ready();
+  m.field('Data do item').onChange({target:{value:'2026-11-24'}});
+  m.field('Auxiliar do item').onChange({target:{value:'a2'}});
+  m.field('Período do item').onChange({target:{value:'Noite'}});
+  m.field('Observações do item').onChange({target:{value:'Teste manual'}});
+  assert.equal(m.button('P0.4').disabled,true);
+  await m.button('P0.3').onClick();
+  assert.deepEqual(m.calls,[{name:'substituirItensNeonEditor',input:{rodizioId:'r1',revisaoOriginal:7,itens:[{...oldItem,data:'2026-11-24',auxiliar_id:'a2',periodo:'Noite',observacoes:'Teste manual'}]}}]);
+});
+test('manual editing rejects date outside persisted period without RPC',async()=>{
+  const m=mount({});await m.ready();
+  m.field('Data do item').onChange({target:{value:'2026-12-01'}});
+  await m.button('P0.3').onClick();
+  assert.equal(m.calls.length,0);
+});
+test('manual edit handler cannot modify a locked record even when invoked directly',async()=>{
+  const m=mount({rodizio:{...rodizio,status:'travado',travado:true}});await m.ready();
+  m.field('Auxiliar do item').onChange({target:{value:'a2'}});
+  assert.equal(m.field('Auxiliar do item').value,'a1');
+  await m.button('P0.3').onClick();
+  assert.equal(m.calls.length,0);
 });
