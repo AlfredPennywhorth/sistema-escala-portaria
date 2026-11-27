@@ -14,9 +14,9 @@
  * Trata conflitos OCC, falhas de autorização, timeout e respostas indeterminadas.
  */
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Save, X, AlertCircle, Check, Lock, Trash2, Send, ChevronDown, Zap } from 'lucide-react';
-import type { RodizioNeonVersionado, RodizioItemInput } from '../types/supabase';
+import type { RodizioNeonVersionado, RodizioItemInput, Auxiliar } from '../types/supabase';
 import {
   criarRascunhoNeonEditor,
   atualizarCabecalhoNeonEditor,
@@ -33,6 +33,8 @@ import {
   type ExclusaoRascunhoNeon,
 } from '../services/neon/rodizioEditorNeonService';
 import { NeonRodizioGerador } from './NeonRodizioGerador';
+import { listarAuxiliares } from '../services/neon/auxiliaresService';
+import { PORTAS_GERACAO_NEON } from '../services/neon/rodizioGeracaoNeonService';
 
 interface NeonRodizioEditorProps {
   rodizio: RodizioNeonVersionado | null;
@@ -61,6 +63,18 @@ export function NeonRodizioEditor({
   // Estado dos itens
   const [itens, setItens] = useState<RodizioItemInput[]>(itensInicial);
 
+  const [auxiliares, setAuxiliares] = useState<Auxiliar[] | null>(null);
+  const [erroAuxiliares, setErroAuxiliares] = useState<string | null>(null);
+  useEffect(() => {
+    let ativo = true;
+    if (rodizio) void listarAuxiliares(true).then(r => {
+      if (!ativo) return;
+      if (r.error || !r.data || r.data.length >= 1000) setErroAuxiliares(r.error || 'Cadastro indisponível ou incompleto.');
+      else setAuxiliares(r.data);
+    });
+    return () => { ativo = false; };
+  }, [rodizio]);
+
   // Controle de operação
   const [emOperacao, setEmOperacao] = useState(false);
   const [operacaoAtual, setOperacaoAtual] = useState<string | null>(null);
@@ -78,28 +92,36 @@ export function NeonRodizioEditor({
   const bloqueioOperacao = useRef(false);
   const [reconciliar, setReconciliar] = useState(false);
 
+  const rascunhoEditavel = !!rodizio && rodizio.status === 'rascunho' && rodizio.travado === false;
+  const bloquearItens = emOperacao || reconciliar || !rascunhoEditavel || !auxiliares || !Number.isSafeInteger(revisaoOriginal);
+  const bloquearCabecalho = emOperacao || reconciliar || (!!rodizio && (!rascunhoEditavel || !Number.isSafeInteger(revisaoOriginal)));
+  const itensAlterados = JSON.stringify(itens) !== JSON.stringify(itensInicial);
+  const cabecalhoAlterado = !!rodizio && (titulo !== rodizio.titulo || dataInicio !== rodizio.data_inicio || dataFim !== rodizio.data_fim || observacoes !== (rodizio.observacoes ?? ''));
+
   // =========================================================================
   // Gestão de itens
   // =========================================================================
 
   const adicionarItem = () => {
+    if (bloquearItens) return;
     const novoItem: RodizioItemInput = {
-      data: '',
-      porta: '',
+      data: rodizio?.data_inicio ?? '',
+      porta: PORTAS_GERACAO_NEON[0].nome,
       periodo: null,
       auxiliar_id: null,
       observacoes: null,
     };
-    setItens([...itens, novoItem]);
+    setItens(prev => [...prev, novoItem]);
   };
 
-  const editarItem = (index: number) => {
-    // TODO: Implementar edição inline de itens
-    console.log('Editar item:', index);
+  const editarItem = (index: number, alteracao: Partial<RodizioItemInput>) => {
+    if (bloquearItens) return;
+    setItens(prev => prev.map((item, i) => i === index ? { ...item, ...alteracao } : item));
   };
 
   const removerItem = (index: number) => {
-    setItens(itens.filter((_, i) => i !== index));
+    if (bloquearItens) return;
+    setItens(prev => prev.filter((_, i) => i !== index));
   };
 
   // =========================================================================
@@ -123,10 +145,11 @@ export function NeonRodizioEditor({
 
     try {
       const resultado = await operacao();
-      if (resultado.error) {
+      if (resultado.error || resultado.data == null || resultado.data === false) {
+        const mensagem = resultado.error || 'Resposta sem confirmação da operação. Confira a lista antes de repetir.';
         setReconciliar(true);
-        setErro(resultado.error + ' Feche e reabra a escala antes de nova tentativa.');
-        onErro?.(resultado.error);
+        setErro(mensagem + ' Feche e reabra a escala antes de nova tentativa.');
+        onErro?.(mensagem);
       } else {
         setReconciliar(true);
         const msg = `Operação "${nome}" concluída com sucesso!`;
@@ -140,7 +163,7 @@ export function NeonRodizioEditor({
       setErro(msg);
       onErro?.(msg);
     } finally {
-      bloqueioOperacao.current = false;
+      // Uma tentativa por abertura; a revisão original não pode ser reutilizada.
       setEmOperacao(false);
       setOperacaoAtual(null);
     }
@@ -169,6 +192,7 @@ export function NeonRodizioEditor({
    * P0.2 — Atualizar cabeçalho (separadamente dos itens)
    */
   async function handleAtualizarCabecalho() {
+    if (bloquearCabecalho || itensAlterados) return;
     if (!rodizio) {
       setErro('Rodízio não carregado. Recarregue e tente novamente.');
       return;
@@ -197,6 +221,7 @@ export function NeonRodizioEditor({
    * P0.3 — Substituir itens (separadamente do cabeçalho)
    */
   async function handleSubstituirItens() {
+    if (bloquearItens || cabecalhoAlterado) return;
     if (!rodizio) {
       setErro('Rodízio não carregado. Recarregue e tente novamente.');
       return;
@@ -207,6 +232,9 @@ export function NeonRodizioEditor({
       return;
     }
 
+    if (itens.some(i => !i.data || i.data < rodizio.data_inicio || i.data > rodizio.data_fim || !i.porta.trim() || (i.auxiliar_id && !auxiliares?.some(a => a.id === i.auxiliar_id)))) {
+      setErro('Revise datas, portas e auxiliares antes de salvar.'); return;
+    }
     const entrada: SubstituicaoItensNeon = {
       rodizioId: rodizio.id,
       itens,
@@ -222,6 +250,7 @@ export function NeonRodizioEditor({
    * P0.4 — Publicar rodízio
    */
   async function handlePublicar() {
+    if (!rascunhoEditavel || itensAlterados || cabecalhoAlterado || itensInicial.length === 0) return;
     if (!rodizio) {
       setErro('Rodízio não carregado. Recarregue e tente novamente.');
       return;
@@ -244,6 +273,7 @@ export function NeonRodizioEditor({
    * P0.5 — Travar rodízio
    */
   async function handleTravar() {
+    if (rodizio?.status !== 'publicado' || rodizio.travado) return;
     if (!rodizio) {
       setErro('Rodízio não carregado. Recarregue e tente novamente.');
       return;
@@ -266,6 +296,7 @@ export function NeonRodizioEditor({
    * P0.6 — Cancelar rodízio
    */
   async function handleCancelar() {
+    if (!rodizio || rodizio.travado || !['rascunho', 'publicado'].includes(rodizio.status) || itensAlterados || cabecalhoAlterado) return;
     if (!rodizio) {
       setErro('Rodízio não carregado. Recarregue e tente novamente.');
       return;
@@ -287,6 +318,7 @@ export function NeonRodizioEditor({
    * P0.7 — Excluir rascunho
    */
   async function handleExcluirRascunho() {
+    if (!rascunhoEditavel || itensAlterados || cabecalhoAlterado) return;
     if (!rodizio) {
       setErro('Rodízio não carregado. Recarregue e tente novamente.');
       return;
@@ -345,6 +377,7 @@ export function NeonRodizioEditor({
             Editar
           </button>
           <button
+            disabled={bloquearItens || cabecalhoAlterado}
             onClick={() => setVista('gerar')}
             className={`flex-1 py-3 px-6 font-medium text-sm border-b-2 transition flex items-center justify-center gap-2 ${
               vista === 'gerar'
@@ -385,10 +418,11 @@ export function NeonRodizioEditor({
         {/* Conteúdo */}
         <div className="p-6 space-y-6">
           {/* Vista: Gerar */}
-          {vista === 'gerar' && rodizio && (
+          {vista === 'gerar' && rodizio && !bloquearItens && !cabecalhoAlterado && (
             <NeonRodizioGerador
               rodizio={rodizio}
               onGerado={(itensGerados) => {
+                if (bloquearItens || cabecalhoAlterado) return;
                 setItens(itensGerados);
                 setVista('editar');
                 setSucesso('Itens gerados com sucesso! Agora é possível editar antes de salvar.');
@@ -417,7 +451,7 @@ export function NeonRodizioEditor({
                   type="text"
                   value={titulo}
                   onChange={(e) => setTitulo(e.target.value)}
-                  disabled={emOperacao || reconciliar}
+                  disabled={bloquearCabecalho}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-slate-100"
                 />
               </div>
@@ -431,7 +465,7 @@ export function NeonRodizioEditor({
                     type="date"
                     value={dataInicio}
                     onChange={(e) => setDataInicio(e.target.value)}
-                    disabled={emOperacao || reconciliar}
+                    disabled={bloquearCabecalho}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-slate-100"
                   />
                 </div>
@@ -443,7 +477,7 @@ export function NeonRodizioEditor({
                     type="date"
                     value={dataFim}
                     onChange={(e) => setDataFim(e.target.value)}
-                    disabled={emOperacao || reconciliar}
+                    disabled={bloquearCabecalho}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-slate-100"
                   />
                 </div>
@@ -456,7 +490,7 @@ export function NeonRodizioEditor({
                 <textarea
                   value={observacoes}
                   onChange={(e) => setObservacoes(e.target.value)}
-                  disabled={emOperacao || reconciliar}
+                  disabled={bloquearCabecalho}
                   rows={3}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-slate-100"
                 />
@@ -465,7 +499,7 @@ export function NeonRodizioEditor({
               {rodizio && (
                 <button
                   onClick={handleAtualizarCabecalho}
-                  disabled={emOperacao || reconciliar}
+                  disabled={bloquearCabecalho || itensAlterados}
                   className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-slate-400 flex items-center justify-center gap-2 transition"
                 >
                   <Save size={18} />
@@ -476,7 +510,7 @@ export function NeonRodizioEditor({
               {!rodizio && (
                 <button
                   onClick={handleCriarRascunho}
-                  disabled={emOperacao || reconciliar}
+                  disabled={bloquearCabecalho}
                   className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-slate-400 flex items-center justify-center gap-2 transition"
                 >
                   <Send size={18} />
@@ -493,13 +527,16 @@ export function NeonRodizioEditor({
                 <h3 className="text-lg font-semibold text-slate-900">Itens da Escala</h3>
                 <button
                   onClick={adicionarItem}
-                  disabled={emOperacao || reconciliar}
+                  disabled={bloquearItens}
                   className="px-3 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 disabled:opacity-50 text-sm"
                 >
                   + Adicionar Item
                 </button>
               </div>
 
+              {erroAuxiliares && <p role="alert" className="text-red-700">{erroAuxiliares}</p>}
+              {!auxiliares && !erroAuxiliares && <p>Carregando auxiliares...</p>}
+              {(itensAlterados || cabecalhoAlterado) && <p className="text-sm text-amber-800">Salve um grupo de alterações por vez e reabra a escala. Alterações de cabeçalho e itens não são uma única transação.</p>}
               <div className="space-y-3 max-h-80 overflow-y-auto border rounded-lg p-4 bg-slate-50">
                 {itens.length === 0 ? (
                   <p className="text-center text-slate-500 py-8">Nenhum item. Adicione um para começar.</p>
@@ -509,28 +546,25 @@ export function NeonRodizioEditor({
                       key={idx}
                       className="bg-white p-3 rounded border border-slate-200 flex justify-between items-start gap-3"
                     >
-                      <div className="flex-1 text-sm">
-                        <div className="font-medium text-slate-900">
-                          {item.data} • {item.porta}
-                        </div>
-                        {item.auxiliar_id && (
-                          <div className="text-slate-600">Auxiliar: {item.auxiliar_id}</div>
-                        )}
-                        {item.observacoes && (
-                          <div className="text-slate-500 text-xs mt-1">{item.observacoes}</div>
-                        )}
-                      </div>
+                      <fieldset disabled={bloquearItens} className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm min-w-0">
+                        <label>Data<input aria-label="Data do item" type="date" min={rodizio.data_inicio} max={rodizio.data_fim} value={item.data} onChange={e => editarItem(idx, { data: e.target.value })} className="block w-full border rounded p-2" /></label>
+                        <label>Porta<select aria-label="Porta do item" value={item.porta} onChange={e => editarItem(idx, { porta: e.target.value })} className="block w-full border rounded p-2">
+                          <option value="">Selecione</option>
+                          {!PORTAS_GERACAO_NEON.some(p => p.nome === item.porta) && item.porta && <option value={item.porta}>{item.porta}</option>}
+                          {PORTAS_GERACAO_NEON.map(p => <option key={p.id} value={p.nome}>{p.nome}</option>)}
+                        </select></label>
+                        <label>Auxiliar<select aria-label="Auxiliar do item" value={item.auxiliar_id ?? ''} onChange={e => editarItem(idx, { auxiliar_id: e.target.value || null })} className="block w-full border rounded p-2">
+                          <option value="">Sem auxiliar</option>
+                          {item.auxiliar_id && !auxiliares?.some(a => a.id === item.auxiliar_id) && <option value={item.auxiliar_id}>Auxiliar não localizada</option>}
+                          {auxiliares?.filter(a => a.ativa || a.id === item.auxiliar_id).map(a => <option key={a.id} value={a.id}>{a.nome}{a.ativa ? '' : ' (inativa)'}</option>)}
+                        </select></label>
+                        <label>Período<input aria-label="Período do item" value={item.periodo ?? ''} onChange={e => editarItem(idx, { periodo: e.target.value || null })} className="block w-full border rounded p-2" /></label>
+                        <label className="sm:col-span-2">Observações<input aria-label="Observações do item" value={item.observacoes ?? ''} onChange={e => editarItem(idx, { observacoes: e.target.value || null })} className="block w-full border rounded p-2" /></label>
+                      </fieldset>
                       <div className="flex gap-2">
                         <button
-                          onClick={() => editarItem(idx)}
-                          disabled={emOperacao || reconciliar}
-                          className="px-2 py-1 text-xs bg-slate-200 rounded hover:bg-slate-300 disabled:opacity-50"
-                        >
-                          Editar
-                        </button>
-                        <button
                           onClick={() => removerItem(idx)}
-                          disabled={emOperacao || reconciliar}
+                          disabled={bloquearItens}
                           className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 disabled:opacity-50"
                         >
                           Remover
@@ -543,7 +577,7 @@ export function NeonRodizioEditor({
 
               <button
                 onClick={handleSubstituirItens}
-                disabled={emOperacao || reconciliar || itens.length === 0}
+                disabled={bloquearItens || cabecalhoAlterado || itens.length === 0}
                 className="w-full mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-slate-400 flex items-center justify-center gap-2 transition"
               >
                 <Save size={18} />
@@ -559,7 +593,7 @@ export function NeonRodizioEditor({
               <div className="grid grid-cols-2 gap-3">
                 <button
                   onClick={handlePublicar}
-                  disabled={emOperacao || reconciliar || rodizio.status !== 'rascunho'}
+                  disabled={bloquearCabecalho || itensAlterados || cabecalhoAlterado || itensInicial.length === 0}
                   className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-slate-400 flex items-center justify-center gap-2 transition text-sm"
                 >
                   <Send size={16} />
@@ -568,7 +602,7 @@ export function NeonRodizioEditor({
 
                 <button
                   onClick={handleTravar}
-                  disabled={emOperacao || reconciliar || rodizio.status === 'travado'}
+                  disabled={emOperacao || reconciliar || rodizio.travado || rodizio.status !== 'publicado'}
                   className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 disabled:bg-slate-400 flex items-center justify-center gap-2 transition text-sm"
                 >
                   <Lock size={16} />
@@ -577,7 +611,7 @@ export function NeonRodizioEditor({
 
                 <button
                   onClick={handleCancelar}
-                  disabled={emOperacao || reconciliar || rodizio.status === 'cancelado'}
+                  disabled={emOperacao || reconciliar || rodizio.travado || !['rascunho', 'publicado'].includes(rodizio.status) || itensAlterados || cabecalhoAlterado}
                   className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:bg-slate-400 flex items-center justify-center gap-2 transition text-sm"
                 >
                   <AlertCircle size={16} />
@@ -586,7 +620,7 @@ export function NeonRodizioEditor({
 
                 <button
                   onClick={handleExcluirRascunho}
-                  disabled={emOperacao || reconciliar || rodizio.status !== 'rascunho'}
+                  disabled={bloquearCabecalho || itensAlterados || cabecalhoAlterado}
                   className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-slate-400 flex items-center justify-center gap-2 transition text-sm"
                 >
                   <Trash2 size={16} />
