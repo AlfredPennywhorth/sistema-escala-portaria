@@ -27,3 +27,15 @@
 4. SQL12, backup restaurável Supabase, segundo Admin, migração/reconciliação real, E2E e aprovação de produção permanecem pendentes.
 
 Nenhuma SQL13/SQL12 executada. Não usar como GO de produção.
+
+
+## Atualização posterior — execução autorizada da SQL13
+O responsável autorizou expressamente o procedimento alternativo exclusivamente em br-little-hill-b6q7979y, com risco residual dos papéis gerenciados e controles compensatórios, sem alterar esses papéis. O registro anterior NO-GO para instalação foi superado somente neste escopo; produção e homologação JWT permanecem NO-GO.
+
+- Artefato imutável: blob 29926bb24c938ce85cdba636a0c962ae1f02266a do commit b194ab34bf471e3aa491917e517e1ddb4d0b073d.
+- Metadados confirmados: projeto blue-sky-02214231, branch br-little-hill-b6q7979y, compute ep-sparkling-frog-b6k2wvw7, banco rodizio_portas, executor rodizio_portas_owner, Data API enabled=false. Recuperação br-square-sunset-b61gcroy pronta e sem endpoint.
+- Execução: os seis comandos SQL originais entre BEGIN/COMMIT foram enviados na mesma transação gerenciada pelo conector, sem dividir corpos PL/pgSQL; duas guardas adicionais após o lock e antes do commit verificaram ausência de outros clientes e hashes das duas tabelas. O conector retornou sucesso em oito comandos.
+- Preflight e postflight do arquivo aprovado passaram. Corpo RPC antes b06899977f63be59f8c993b05d134498; depois f2100180626d8fd8881aebb99ca57d0d, exatamente o esperado. Hashes das escalas f97fbb54ecd28143cc6a41475a76d4ed e itens aae68ef47c52dbeeb15334dfa0edf856 permaneceram idênticos. Zero outros clientes nas consultas pré/pós; não afirmar exclusividade absoluta dos papéis gerenciados.
+- Endpoint bloqueado novamente após execução e auditoria posterior. Nenhuma mudança nos papéis internos, na produção, na origem Supabase ou na branch de recuperação.
+- Catálogo posterior confirmou auth.uid() do pg_session_jwt, wrappers de identidade/perfil SECURITY DEFINER com search_path vazio; três perfis (um de cada). Isso não prova JWT real.
+- **SQL13 instalada; homologação funcional ainda pendente.** Necessários JWT real em acesso de teste controlado, segundo Admin independente, testes de revisão/estado, FK, concorrência, histórico e rollback pós-commit. SQL12 não executada e continua exigindo autorização específica. Não marcar gates de produção como aprovados.
