@@ -88,22 +88,22 @@ export function App() {
       setResult(JSON.stringify({scenario:s,sqlstate:r.error?.code??null,returnValue:r.error?null:r.data,acceptable,requiresIndependentReconciliation:true},null,2));
       if(!acceptable) setHalted(true); return;
     }
-    const f = s === 'stale' || s === 'locked' ? locked : s === 'published' ? published : draft;
+    const f = s === 'locked' ? locked : s === 'stale' || s === 'published' ? published : draft;
     const before = await snapshot(f,f.revisao,f.count);
     if ((await identity()).id !== actor.id) throw Error('session changed');
     const key = 'sql13-attempt-' + s;
     if (localStorage.getItem(key)) throw Error('already attempted');
     localStorage.setItem(key,'1'); markAttempt(s);
     const response = await client.rpc('substituir_itens_rodizio_rascunho_versionado',{
-      p_rodizio_id:f.id,p_revisao_esperada:s==='stale'?1:f.revisao,
+      p_rodizio_id:f.id,p_revisao_esperada:s==='stale'?f.revisao+1:f.revisao,
       p_itens:[{data:'2026-12-15',porta:'Entrada',auxiliar_id:s==='invalid-fk'?'ffffffff-ffff-4fff-8fff-ffffffffffff':null,observacoes:'TESTE SQL13'}]
     });
     if ((await identity()).id !== actor.id) throw Error('session changed');
     const after = await snapshot(f,s==='valid'&&!response.error?1:f.revisao,s==='valid'&&!response.error?1:f.count);
     const code = response.error?.code ?? null;
-    const expected = s==='stale'?'P0001':s==='invalid-fk'?'23503':s==='valid'?null:'42501';
+    const expected = s==='stale'?'P0001':s==='invalid-fk'?'23503':s==='valid'?null:s==='locked'?'P0002':'42501';
     const valid = s==='valid' ? !response.error && String(response.data)==='1' && after.items[0]?.porta==='Entrada' && after.items[0]?.observacoes==='TESTE SQL13' && String(after.items[0]?.data).slice(0,10)==='2026-12-15' && after.items[0]?.auxiliar_id===null : code===expected && JSON.stringify(before)===JSON.stringify(after) && (expected!=='42501'||(response.error?.message??'').includes('Substituicao permitida somente'));
-    setResult(JSON.stringify({branch:'br-little-hill-b6q7979y',scenario:s,perfil:actor.perfil,sqlstate:code,expected,approved:valid},null,2));
+    setResult(JSON.stringify({branch:'br-little-hill-b6q7979y',scenario:s,perfil:actor.perfil,sqlstate:code,expected,approved:valid,control:s==='locked'?'RLS: proteção de histórico; não comprova ordem OCC':s==='stale'?'OCC em publicado não travado com revisão divergente':'RPC'},null,2));
     if (valid) { passed.current.add(s); if(s==='invalid-fk') setFkPassed(true); } else setHalted(true);
   }
   async function armRace() {
