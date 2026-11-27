@@ -11,9 +11,11 @@
 
 import { useState, useEffect } from 'react';
 import { AlertCircle, Printer, X } from 'lucide-react';
-import type { RodizioComItens, Auxiliar } from '../types/supabase';
+import type { RodizioComItens } from '../types/supabase';
 import { obterRodizioComItensNeonHml } from '../services/neon/rodizioFunctionalHmlService';
 import logoCCB from '/logo-ccb.png';
+import { listarAuxiliares } from '../services/neon/auxiliaresService';
+import { format, parseISO } from 'date-fns';
 
 interface NeonRelatorioRodizioProps {
   rodizioId: string;
@@ -22,23 +24,39 @@ interface NeonRelatorioRodizioProps {
 
 export function NeonRelatorioRodizio({ rodizioId, onFechar }: NeonRelatorioRodizioProps) {
   const [rodizio, setRodizio] = useState<RodizioComItens | null>(null);
+  const [nomes, setNomes] = useState<Record<string, string>>({});
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
 
   // Carregar dados do Neon
   useEffect(() => {
+    let ativo = true;
     const carregarDados = async () => {
       setCarregando(true);
       setErro(null);
-      const { data, error } = await obterRodizioComItensNeonHml(rodizioId);
-      if (error) {
-        setErro(error);
-      } else if (data) {
-        setRodizio(data);
+      setRodizio(null);
+      try {
+        const [escala, cadastro] = await Promise.all([obterRodizioComItensNeonHml(rodizioId), listarAuxiliares(true)]);
+        if (!ativo) return;
+        if (escala.error || !escala.data || cadastro.error || !cadastro.data || cadastro.data.length >= 1000) {
+          setErro(escala.error || cadastro.error || 'Dados do relatório incompletos.');
+          return;
+        }
+        const mapa = Object.fromEntries(cadastro.data.map(a => [a.id, a.nome]));
+        if (escala.data.itens.some(i => i.auxiliar_id && !mapa[i.auxiliar_id])) {
+          setErro('Uma ou mais auxiliares não foram localizadas. Não é seguro emitir o relatório incompleto.');
+          return;
+        }
+        setNomes(mapa);
+        setRodizio(escala.data);
+      } catch {
+        if (ativo) setErro('Falha ao carregar relatório.');
+      } finally {
+        if (ativo) setCarregando(false);
       }
-      setCarregando(false);
     };
-    carregarDados();
+    void carregarDados();
+    return () => { ativo = false; };
   }, [rodizioId]);
 
   const handleImprimir = () => {
@@ -168,8 +186,8 @@ export function NeonRelatorioRodizio({ rodizioId, onFechar }: NeonRelatorioRodiz
             <div>
               <p className="text-xs uppercase text-slate-600 font-semibold mb-1">Período</p>
               <p className="text-sm text-slate-900">
-                {new Date(r.data_inicio).toLocaleDateString('pt-BR')} a{' '}
-                {new Date(r.data_fim).toLocaleDateString('pt-BR')}
+                {format(parseISO(r.data_inicio), 'dd/MM/yyyy')} a{' '}
+                {format(parseISO(r.data_fim), 'dd/MM/yyyy')}
               </p>
             </div>
             <div>
@@ -204,15 +222,11 @@ export function NeonRelatorioRodizio({ rodizioId, onFechar }: NeonRelatorioRodiz
                   items.map((item, idx) => (
                     <tr key={item.id || idx} className="hover:bg-slate-50 print:hover:bg-transparent">
                       <td className="border border-slate-300 px-4 py-2">
-                        {new Date(item.data).toLocaleDateString('pt-BR')}
+                        {format(parseISO(item.data), 'dd/MM/yyyy')}
                       </td>
                       <td className="border border-slate-300 px-4 py-2 font-semibold">{item.porta}</td>
                       <td className="border border-slate-300 px-4 py-2">
-                        {typeof item.auxiliar === 'object' && item.auxiliar
-                          ? (item.auxiliar as unknown as Auxiliar).nome
-                          : item.auxiliar_id
-                          ? item.auxiliar_id.substring(0, 8)
-                          : '—'}
+                        {item.auxiliar_id ? nomes[item.auxiliar_id] : '—'}
                       </td>
                       <td className="border border-slate-300 px-4 py-2 text-center">
                         {item.periodo ?? '—'}
