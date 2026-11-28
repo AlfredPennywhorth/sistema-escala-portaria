@@ -60,6 +60,14 @@ export interface Rodizio {
   created_at: string;
 }
 
+/**
+ * Rodizio com campo de versão para operações OCC no Neon.
+ * Apenas retornado por operações de leitura Neon, nunca por Supabase.
+ */
+export interface RodizioNeonVersionado extends Rodizio {
+  revisao: number;
+}
+
 export interface RodizioItem {
   id: string;
   rodizio_id: string;

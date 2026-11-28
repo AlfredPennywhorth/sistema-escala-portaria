@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Layout } from './components/Layout';
 import { EscalaView } from './components/EscalaView';
 import { Configuracoes } from './components/Configuracoes';
@@ -8,17 +8,18 @@ import { AuxiliaresAdmin } from './components/AuxiliaresAdmin';
 import { ConfigCheck } from './components/ConfigCheck';
 import { LoginPage } from './components/LoginPage';
 import { useAuth } from './hooks/useAuth';
+import { NeonAuthHomologacao } from './components/NeonAuthHomologacao';
+import { NeonRpcBranchHomologacao } from './components/NeonRpcBranchHomologacao';
+import { NeonOperacionalHml } from './components/NeonOperacionalHml';
+import { NeonAreaAuxiliarHml } from './components/NeonAreaAuxiliarHml';
+import { NeonRodiziosOperacional } from './components/NeonRodiziosOperacional';
+import { NeonP2CadastrosReadOnly } from './components/NeonP2CadastrosReadOnly';
+import { NeonOperacaoIntegrada } from './components/NeonOperacaoIntegrada';
+import { NeonAdminSessionGate } from './components/NeonAdminSessionGate';
 
-export function App() {
+function AppPrincipal() {
   const { loading } = useAuth();
-  const [currentPage, setCurrentPage] = useState('escala');
-
-  useEffect(() => {
-    const hash = window.location.hash;
-    if (hash && hash.includes('type=recovery')) {
-      setCurrentPage('login');
-    }
-  }, []);
+  const [currentPage, setCurrentPage] = useState(() => window.location.hash.includes('type=recovery') ? 'login' : 'escala');
 
   if (loading) {
     return (
@@ -58,6 +59,53 @@ export function App() {
       <ConfigCheck />
     </>
   );
+}
+
+// Só habilita a tela isolada em build de homologação com configuração explícita.
+// Sem esta variável, o runtime Supabase original continua em uso.
+export function App() {
+  if (import.meta.env.VITE_NEON_HOMOLOGACAO_ENABLED === 'true') {
+    // A rota da RPC usa Auth/Data API da branch DESCARTAVEL, nunca a principal.
+    // Evita expor o piloto no dominio de producao mesmo com flag acidental.
+    // Cloudflare Pages gera hosts próprios para cada deployment preview,
+    // ex.: aff92e86.rodizio-portaria-neon-hml.pages.dev.
+    // Restringir ao projeto Neon HML e exigir opt-in explícito na URL.
+    // Nunca habilitar em rodizio-portaria.pages.dev ou em domínio externo.
+    const hostname = window.location.hostname.toLowerCase();
+    const hostnameHml = hostname === 'rodizio-portaria-neon-hml.pages.dev' ||
+      /^[a-z0-9-]+\.rodizio-portaria-neon-hml\.pages\.dev$/.test(hostname);
+    if (hostnameHml &&
+        new URLSearchParams(window.location.search).get('minhas-datas-neon') === '1') {
+      return <NeonAreaAuxiliarHml />;
+    }
+    if (hostnameHml &&
+        new URLSearchParams(window.location.search).get('editor-rodizios-neon') === '1') {
+      // Tela operacional com as 7 operações de editor de rodízios (P0)
+      return <NeonAdminSessionGate><NeonRodiziosOperacional /></NeonAdminSessionGate>;
+    }
+    if (hostnameHml &&
+        new URLSearchParams(window.location.search).get('p2-cadastros-neon') === '1') {
+      // P2: Consulta de auxiliares e restrições (somente leitura, mutações bloqueadas)
+      return <NeonAdminSessionGate><NeonP2CadastrosReadOnly /></NeonAdminSessionGate>;
+    }
+    if (hostnameHml &&
+        new URLSearchParams(window.location.search).get('p4-operacao-neon') === '1') {
+      // P4: Navegação e experiência operacional integrada (P0+P1+P3)
+      return <NeonAdminSessionGate><NeonOperacaoIntegrada /></NeonAdminSessionGate>;
+    }
+    if (hostnameHml &&
+        new URLSearchParams(window.location.search).get('operacional-neon') === '1') {
+      // Prévia administrativa exclusivamente de leitura; a UI de produção
+      // permanece inalterada e todas as mutações seguem bloqueadas.
+      return <NeonOperacionalHml />;
+    }
+    if (hostnameHml &&
+        new URLSearchParams(window.location.search).get('rpc-branch-test') === '1') {
+      return <NeonRpcBranchHomologacao />;
+    }
+    return <NeonAuthHomologacao />;
+  }
+  return <AppPrincipal />;
 }
 
 export default App;

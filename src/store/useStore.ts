@@ -15,7 +15,6 @@ interface AppState {
   
   setEscalas: (escalas: Turno[]) => void;
   setDataAlvo: (data: string) => void;
-  updateCargaAcumulada: (colaboradoraId: string, delta: number) => void;
 }
 
 

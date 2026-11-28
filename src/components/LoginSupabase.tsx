@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { Mail, Lock, Send, Loader2, X } from 'lucide-react';
 import clsx from 'clsx';
@@ -11,7 +11,7 @@ interface LoginSupabaseProps {
 export function LoginSupabase({ onClose, compact = false }: LoginSupabaseProps) {
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
-  const [modo, setModo] = useState<'senha' | 'magiclink' | 'cadastro' | 'recuperacao' | 'atualizar'>('senha');
+  const [modo, setModo] = useState<'senha' | 'magiclink' | 'cadastro' | 'recuperacao' | 'atualizar'>(() => window.location.hash.includes('type=recovery') ? 'atualizar' : 'senha');
   const [erro, setErro] = useState<string | null>(null);
   const [sucesso, setSucesso] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(false);
@@ -122,14 +122,6 @@ export function LoginSupabase({ onClose, compact = false }: LoginSupabaseProps) 
       setCarregando(false);
     }
   };
-
-  // Detecta se a URL possui o token de recuperação
-  useEffect(() => {
-    const hash = window.location.hash;
-    if (hash && hash.includes('type=recovery')) {
-      setModo('atualizar');
-    }
-  }, []);
 
   return (
     <div className={clsx(compact ? "bg-white rounded-xl p-4 shadow-lg" : "min-h-screen flex items-center justify-center bg-gray-100 p-4")}>
